@@ -3,6 +3,12 @@
 import { useQueueStatus, useStats } from "@/lib/api";
 import { StatusBadge } from "@/components/status-badge";
 import Link from "next/link";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Skeleton } from "@/components/ui/skeleton";
+import { ArrowRight } from "lucide-react";
 
 export default function QueuePage() {
   const { data: queue, isLoading: queueLoading } = useQueueStatus();
@@ -10,9 +16,25 @@ export default function QueuePage() {
 
   if (queueLoading) {
     return (
-      <div className="text-center py-12 text-muted-foreground">Loading...</div>
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold">Queue Monitor</h1>
+          <p className="text-sm text-muted-foreground mt-1">Live view of job pipeline and worker activity</p>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Skeleton key={i} className="h-24 rounded-xl" />
+          ))}
+        </div>
+        <Skeleton className="h-32 rounded-xl" />
+        <Skeleton className="h-48 rounded-xl" />
+      </div>
     );
   }
+
+  const runningJobs = queue?.running_jobs ?? 0;
+  const maxWorkers = queue?.max_workers ?? 3;
+  const workerUtilization = maxWorkers > 0 ? Math.round((runningJobs / maxWorkers) * 100) : 0;
 
   return (
     <div className="space-y-6">
@@ -29,170 +51,172 @@ export default function QueuePage() {
           label="Queue Depth"
           value={queue?.queue_depth ?? 0}
           sub="waiting in Redis"
-          color="text-zinc-300"
+          color="text-muted-foreground"
           pulse={false}
         />
         <PipelineCard
           label="Running"
-          value={queue?.running_jobs ?? 0}
-          sub={`of ${queue?.max_workers ?? 0} workers`}
-          color="text-blue-400"
-          pulse={(queue?.running_jobs ?? 0) > 0}
+          value={runningJobs}
+          sub={`of ${maxWorkers} workers`}
+          color="text-primary"
+          pulse={runningJobs > 0}
         />
         <PipelineCard
           label="Completed"
           value={stats?.jobs.completed ?? 0}
           sub="total"
-          color="text-green-400"
+          color="text-success"
           pulse={false}
         />
         <PipelineCard
           label="Failed"
           value={stats?.jobs.failed ?? 0}
           sub="total"
-          color="text-red-400"
+          color="text-destructive"
           pulse={false}
         />
       </div>
 
       {/* Worker slots visualization */}
-      <div className="bg-card border border-border rounded-lg p-4">
-        <h2 className="text-sm font-medium mb-3">Worker Slots</h2>
-        <div className="flex gap-2">
-          {Array.from({ length: queue?.max_workers ?? 3 }).map((_, i) => {
-            const isActive = i < (queue?.running_jobs ?? 0);
-            return (
-              <div
-                key={i}
-                className={`flex-1 h-10 rounded-md border flex items-center justify-center text-xs font-medium transition-all ${
-                  isActive
-                    ? "bg-blue-900/30 border-blue-700 text-blue-400 animate-pulse"
-                    : "bg-background border-border text-muted-foreground"
-                }`}
-              >
-                Worker {i + 1}
-                {isActive && (
-                  <span className="ml-1.5 w-1.5 h-1.5 bg-blue-400 rounded-full" />
-                )}
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Pipeline flow visualization */}
-      <div className="bg-card border border-border rounded-lg p-4">
-        <h2 className="text-sm font-medium mb-4">Pipeline Flow</h2>
-        <div className="flex items-center justify-between">
-          <PipelineStage
-            label="Queued"
-            count={queue?.queued_jobs ?? 0}
-            color="bg-zinc-700"
-            textColor="text-zinc-300"
-          />
-          <Arrow />
-          <PipelineStage
-            label="Running"
-            count={queue?.running_jobs ?? 0}
-            color="bg-blue-900/50"
-            textColor="text-blue-400"
-            active
-          />
-          <Arrow />
-          <div className="flex gap-3">
-            <PipelineStage
-              label="Completed"
-              count={stats?.jobs.completed ?? 0}
-              color="bg-green-900/50"
-              textColor="text-green-400"
-            />
-            <PipelineStage
-              label="Failed"
-              count={stats?.jobs.failed ?? 0}
-              color="bg-red-900/50"
-              textColor="text-red-400"
-            />
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-sm">Worker Slots</CardTitle>
+            <Badge variant="secondary" className="text-xs">{workerUtilization}% utilized</Badge>
           </div>
-        </div>
-      </div>
+        </CardHeader>
+        <CardContent>
+          <Progress value={workerUtilization} className="mb-4" />
+          <div className="flex gap-2">
+            {Array.from({ length: maxWorkers }).map((_, i) => {
+              const isActive = i < runningJobs;
+              return (
+                <div
+                  key={i}
+                  className={`flex-1 h-10 rounded-md border flex items-center justify-center text-xs font-medium transition-all ${
+                    isActive
+                      ? "bg-primary/10 border-primary/50 text-primary animate-pulse"
+                      : "bg-muted/30 border-border text-muted-foreground"
+                  }`}
+                >
+                  Worker {i + 1}
+                  {isActive && (
+                    <span className="ml-1.5 w-1.5 h-1.5 bg-primary rounded-full" />
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Pipeline flow */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm">Pipeline Flow</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-between">
+            <PipelineStage
+              label="Queued"
+              count={queue?.queued_jobs ?? 0}
+              variant="secondary"
+            />
+            <ArrowRight className="size-5 text-muted-foreground" />
+            <PipelineStage
+              label="Running"
+              count={runningJobs}
+              variant="default"
+              active
+            />
+            <ArrowRight className="size-5 text-muted-foreground" />
+            <div className="flex gap-3">
+              <PipelineStage
+                label="Completed"
+                count={stats?.jobs.completed ?? 0}
+                variant="success"
+              />
+              <PipelineStage
+                label="Failed"
+                count={stats?.jobs.failed ?? 0}
+                variant="destructive"
+              />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Throughput stats */}
       {stats && (
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div className="bg-card border border-border rounded-lg p-4">
-            <p className="text-xs text-muted-foreground">Total Pages Crawled</p>
-            <p className="text-2xl font-bold">
-              {stats.jobs.total_pages_crawled}
-            </p>
-          </div>
-          <div className="bg-card border border-border rounded-lg p-4">
-            <p className="text-xs text-muted-foreground">Avg Response Time</p>
-            <p className="text-2xl font-bold">
-              {stats.jobs.avg_response_time_ms.toFixed(0)}ms
-            </p>
-          </div>
-          <div className="bg-card border border-border rounded-lg p-4">
-            <p className="text-xs text-muted-foreground">Success Rate</p>
-            <p className="text-2xl font-bold">
-              {stats.jobs.completed + stats.jobs.failed > 0
-                ? Math.round(
-                    (stats.jobs.completed /
-                      (stats.jobs.completed + stats.jobs.failed)) *
-                      100,
-                  )
-                : 0}
-              %
-            </p>
-          </div>
+          <Card>
+            <CardContent className="p-4">
+              <p className="text-xs text-muted-foreground">Total Pages Crawled</p>
+              <p className="text-2xl font-bold">{stats.jobs.total_pages_crawled}</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <p className="text-xs text-muted-foreground">Avg Response Time</p>
+              <p className="text-2xl font-bold">{stats.jobs.avg_response_time_ms.toFixed(0)}ms</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <p className="text-xs text-muted-foreground">Success Rate</p>
+              <p className="text-2xl font-bold">
+                {stats.jobs.completed + stats.jobs.failed > 0
+                  ? Math.round((stats.jobs.completed / (stats.jobs.completed + stats.jobs.failed)) * 100)
+                  : 0}%
+              </p>
+            </CardContent>
+          </Card>
         </div>
       )}
 
       {/* Recent activity feed */}
-      <div className="bg-card border border-border rounded-lg">
-        <div className="px-4 py-3 border-b border-border">
-          <h2 className="text-sm font-medium">Recent Activity</h2>
-        </div>
-        <div className="divide-y divide-border max-h-[500px] overflow-y-auto">
-          {(queue?.recent_activity ?? []).length === 0 && (
-            <div className="p-6 text-center text-muted-foreground text-sm">
-              No activity yet
-            </div>
-          )}
-          {(queue?.recent_activity ?? []).map((activity) => (
-            <div
-              key={activity.id}
-              className="px-4 py-2.5 flex items-center gap-3 hover:bg-accent/30 transition-colors"
-            >
-              <StatusBadge status={activity.status} />
-              <div className="flex-1 min-w-0">
-                <Link
-                  href={`/job/${activity.id}`}
-                  className="text-sm text-primary hover:underline truncate block"
-                >
-                  {activity.url}
-                </Link>
-              </div>
-              <span className="text-xs text-muted-foreground whitespace-nowrap">
-                {activity.mode}
-              </span>
-              {activity.pages_crawled != null && activity.pages_crawled > 0 && (
-                <span className="text-xs text-muted-foreground">
-                  {activity.pages_crawled}p
-                </span>
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm">Recent Activity</CardTitle>
+        </CardHeader>
+        <CardContent className="p-0">
+          <ScrollArea className="max-h-[500px]">
+            <div className="divide-y divide-border">
+              {(queue?.recent_activity ?? []).length === 0 && (
+                <div className="p-6 text-center text-muted-foreground text-sm">
+                  No activity yet
+                </div>
               )}
-              <TimeAgo date={activity.created_at} />
-              {activity.error && (
-                <span
-                  className="text-xs text-red-400 truncate max-w-32"
-                  title={activity.error}
+              {(queue?.recent_activity ?? []).map((activity) => (
+                <div
+                  key={activity.id}
+                  className="px-4 py-2.5 flex items-center gap-3 hover:bg-muted/30 transition-colors"
                 >
-                  {activity.error}
-                </span>
-              )}
+                  <StatusBadge status={activity.status} />
+                  <div className="flex-1 min-w-0">
+                    <Link
+                      href={`/job/${activity.id}`}
+                      className="text-sm text-primary hover:underline truncate block"
+                    >
+                      {activity.url}
+                    </Link>
+                  </div>
+                  <Badge variant="outline" className="text-xs">{activity.mode}</Badge>
+                  {activity.pages_crawled != null && activity.pages_crawled > 0 && (
+                    <span className="text-xs text-muted-foreground">{activity.pages_crawled}p</span>
+                  )}
+                  <TimeAgo date={activity.created_at} />
+                  {activity.error && (
+                    <span className="text-xs text-destructive truncate max-w-32" title={activity.error}>
+                      {activity.error}
+                    </span>
+                  )}
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
-      </div>
+          </ScrollArea>
+        </CardContent>
+      </Card>
     </div>
   );
 }
@@ -211,60 +235,39 @@ function PipelineCard({
   pulse: boolean;
 }) {
   return (
-    <div className="bg-card border border-border rounded-lg p-4">
-      <p className="text-xs text-muted-foreground">{label}</p>
-      <p className={`text-3xl font-bold ${color} ${pulse ? "animate-pulse" : ""}`}>
-        {value}
-      </p>
-      <p className="text-[11px] text-muted-foreground mt-0.5">{sub}</p>
-    </div>
+    <Card>
+      <CardContent className="p-4">
+        <p className="text-xs text-muted-foreground">{label}</p>
+        <p className={`text-3xl font-bold ${color} ${pulse ? "animate-pulse" : ""}`}>
+          {value}
+        </p>
+        <p className="text-[11px] text-muted-foreground mt-0.5">{sub}</p>
+      </CardContent>
+    </Card>
   );
 }
 
 function PipelineStage({
   label,
   count,
-  color,
-  textColor,
+  variant,
   active,
 }: {
   label: string;
   count: number;
-  color: string;
-  textColor: string;
+  variant: "default" | "secondary" | "destructive" | "success";
   active?: boolean;
 }) {
   return (
-    <div
-      className={`flex flex-col items-center gap-1 px-4 py-3 rounded-lg ${color} ${active ? "animate-pulse" : ""}`}
-    >
-      <span className={`text-2xl font-bold ${textColor}`}>{count}</span>
-      <span className="text-xs text-muted-foreground">{label}</span>
-    </div>
-  );
-}
-
-function Arrow() {
-  return (
-    <div className="text-muted-foreground px-2">
-      <svg
-        width="24"
-        height="24"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-      >
-        <path d="M5 12h14M12 5l7 7-7 7" />
-      </svg>
+    <div className={`flex flex-col items-center gap-1 px-4 py-3 rounded-lg bg-muted/30 ${active ? "animate-pulse" : ""}`}>
+      <span className="text-2xl font-bold">{count}</span>
+      <Badge variant={variant} className="text-xs">{label}</Badge>
     </div>
   );
 }
 
 function TimeAgo({ date }: { date: string }) {
-  const seconds = Math.floor(
-    (Date.now() - new Date(date).getTime()) / 1000,
-  );
+  const seconds = Math.floor((Date.now() - new Date(date).getTime()) / 1000);
   let text: string;
   if (seconds < 60) text = `${seconds}s ago`;
   else if (seconds < 3600) text = `${Math.floor(seconds / 60)}m ago`;
@@ -272,8 +275,6 @@ function TimeAgo({ date }: { date: string }) {
   else text = `${Math.floor(seconds / 86400)}d ago`;
 
   return (
-    <span className="text-[11px] text-muted-foreground whitespace-nowrap">
-      {text}
-    </span>
+    <span className="text-[11px] text-muted-foreground whitespace-nowrap">{text}</span>
   );
 }

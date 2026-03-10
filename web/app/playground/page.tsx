@@ -4,8 +4,22 @@ import { useState } from "react";
 import { useSubmitJob, useJob } from "@/lib/api";
 import { StatusBadge } from "@/components/status-badge";
 import { MarkdownViewer } from "@/components/markdown-viewer";
-
-type Tab = "markdown" | "metadata" | "raw" | "headings";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Slider } from "@/components/ui/slider";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { toast } from "sonner";
+import { Loader2, Copy, FlaskConical } from "lucide-react";
 
 export default function PlaygroundPage() {
   const submitJob = useSubmitJob();
@@ -15,16 +29,12 @@ export default function PlaygroundPage() {
   const [limit, setLimit] = useState(10);
   const [waitSeconds, setWaitSeconds] = useState(3);
   const [activeJobId, setActiveJobId] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<Tab>("markdown");
   const [activeResultIdx, setActiveResultIdx] = useState(0);
   const [history, setHistory] = useState<
     { id: string; url: string; status: string }[]
   >([]);
 
-  const {
-    data: job,
-    isLoading: jobLoading,
-  } = useJob(activeJobId ?? "");
+  const { data: job, isLoading: jobLoading } = useJob(activeJobId ?? "");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -37,17 +47,16 @@ export default function PlaygroundPage() {
       });
       setActiveJobId(result.task_id);
       setActiveResultIdx(0);
-      setActiveTab("markdown");
       setHistory((h) => [
         { id: result.task_id, url, status: "queued" },
         ...h,
       ]);
-    } catch {
-      // error shown inline
+      toast.success("Job submitted");
+    } catch (err) {
+      toast.error(`Submit failed: ${(err as Error).message}`);
     }
   };
 
-  // Update history status
   if (job && history.length > 0 && history[0].id === job.task_id) {
     if (history[0].status !== job.status) {
       history[0].status = job.status;
@@ -56,332 +65,299 @@ export default function PlaygroundPage() {
 
   const currentResult = job?.results?.[activeResultIdx];
 
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+    toast.success("Copied to clipboard");
+  };
+
   return (
-    <div className="flex flex-col gap-4">
-      <h1 className="text-2xl font-bold">Playground</h1>
-      <p className="text-sm text-muted-foreground">
-        Test scrape any URL and see results instantly. Runs a real job through
-        the queue.
-      </p>
+    <div className="space-y-4">
+      <div>
+        <h1 className="text-2xl font-bold">Playground</h1>
+        <p className="text-sm text-muted-foreground mt-1">
+          Test scrape any URL and see results instantly. Runs a real job through the queue.
+        </p>
+      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-        {/* Left panel: Input + History */}
+        {/* Left panel */}
         <div className="lg:col-span-4 space-y-4">
-          {/* Input form */}
-          <div className="bg-card border border-border rounded-lg p-4">
-            <form onSubmit={handleSubmit} className="space-y-3">
-              <div>
-                <label className="block text-xs font-medium text-muted-foreground mb-1">
-                  URL
-                </label>
-                <input
-                  type="url"
-                  value={url}
-                  onChange={(e) => setUrl(e.target.value)}
-                  placeholder="https://example.com/article"
-                  required
-                  className="w-full bg-background border border-border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-muted-foreground mb-1">
-                  Mode
-                </label>
-                <div className="flex gap-1">
-                  {(["scrape", "crawl", "http"] as const).map((m) => (
-                    <button
-                      key={m}
-                      type="button"
-                      onClick={() => setMode(m)}
-                      className={`flex-1 px-2 py-1.5 rounded text-xs border transition-colors ${
-                        mode === m
-                          ? "bg-primary text-primary-foreground border-primary"
-                          : "bg-background border-border text-muted-foreground hover:text-foreground"
-                      }`}
-                    >
-                      {m}
-                    </button>
-                  ))}
+          <Card>
+            <CardContent className="p-4">
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="pg-url" className="text-xs">URL</Label>
+                  <Input
+                    id="pg-url"
+                    type="url"
+                    value={url}
+                    onChange={(e) => setUrl(e.target.value)}
+                    placeholder="https://example.com/article"
+                    required
+                  />
                 </div>
-              </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                {mode !== "scrape" && (
-                  <div>
-                    <label className="block text-xs font-medium text-muted-foreground mb-1">
-                      Limit: {limit}
-                    </label>
-                    <input
-                      type="range"
-                      min={1}
-                      max={50}
-                      value={limit}
-                      onChange={(e) => setLimit(Number(e.target.value))}
-                      className="w-full accent-primary"
-                    />
+                <div className="space-y-2">
+                  <Label className="text-xs">Mode</Label>
+                  <div className="flex gap-1">
+                    {(["scrape", "crawl", "http"] as const).map((m) => (
+                      <Button
+                        key={m}
+                        type="button"
+                        variant={mode === m ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setMode(m)}
+                        className="flex-1 text-xs"
+                      >
+                        {m}
+                      </Button>
+                    ))}
                   </div>
-                )}
-                {mode !== "http" && (
-                  <div>
-                    <label className="block text-xs font-medium text-muted-foreground mb-1">
-                      Wait: {waitSeconds}s
-                    </label>
-                    <input
-                      type="range"
-                      min={1}
-                      max={15}
-                      value={waitSeconds}
-                      onChange={(e) => setWaitSeconds(Number(e.target.value))}
-                      className="w-full accent-primary"
-                    />
-                  </div>
-                )}
-              </div>
+                </div>
 
-              {submitJob.error && (
-                <p className="text-destructive text-xs">
-                  {(submitJob.error as Error).message}
-                </p>
-              )}
+                <div className="grid grid-cols-2 gap-3">
+                  {mode !== "scrape" && (
+                    <div className="space-y-2">
+                      <Label className="text-xs">Limit: {limit}</Label>
+                      <Slider
+                        value={[limit]}
+                        onValueChange={([v]) => setLimit(v)}
+                        min={1}
+                        max={50}
+                        step={1}
+                      />
+                    </div>
+                  )}
+                  {mode !== "http" && (
+                    <div className="space-y-2">
+                      <Label className="text-xs">Wait: {waitSeconds}s</Label>
+                      <Slider
+                        value={[waitSeconds]}
+                        onValueChange={([v]) => setWaitSeconds(v)}
+                        min={1}
+                        max={15}
+                        step={1}
+                      />
+                    </div>
+                  )}
+                </div>
 
-              <button
-                type="submit"
-                disabled={submitJob.isPending}
-                className="w-full bg-primary text-primary-foreground py-2 rounded-md text-sm font-medium hover:opacity-90 disabled:opacity-50 transition-opacity"
-              >
-                {submitJob.isPending ? "Submitting..." : "Run Scrape"}
-              </button>
-            </form>
-          </div>
+                {submitJob.error && (
+                  <p className="text-destructive text-xs">
+                    {(submitJob.error as Error).message}
+                  </p>
+                )}
+
+                <Button type="submit" disabled={submitJob.isPending} className="w-full">
+                  {submitJob.isPending ? (
+                    <>
+                      <Loader2 className="size-4 animate-spin" />
+                      Submitting...
+                    </>
+                  ) : (
+                    "Run Scrape"
+                  )}
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
 
           {/* Session history */}
           {history.length > 0 && (
-            <div className="bg-card border border-border rounded-lg p-4">
-              <h3 className="text-xs font-medium text-muted-foreground mb-2">
-                Session History
-              </h3>
-              <div className="space-y-1 max-h-64 overflow-y-auto">
-                {history.map((h) => (
-                  <button
-                    key={h.id}
-                    onClick={() => {
-                      setActiveJobId(h.id);
-                      setActiveResultIdx(0);
-                    }}
-                    className={`w-full text-left px-2 py-1.5 rounded text-xs flex items-center gap-2 transition-colors ${
-                      activeJobId === h.id
-                        ? "bg-accent"
-                        : "hover:bg-accent/50"
-                    }`}
-                  >
-                    <StatusBadge status={h.status} />
-                    <span className="truncate text-muted-foreground flex-1">
-                      {h.url}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </div>
+            <Card>
+              <CardHeader className="p-4 pb-2">
+                <CardTitle className="text-xs text-muted-foreground">Session History</CardTitle>
+              </CardHeader>
+              <CardContent className="p-4 pt-0">
+                <ScrollArea className="max-h-64">
+                  <div className="space-y-1">
+                    {history.map((h) => (
+                      <button
+                        key={h.id}
+                        onClick={() => {
+                          setActiveJobId(h.id);
+                          setActiveResultIdx(0);
+                        }}
+                        className={`w-full text-left px-2 py-1.5 rounded text-xs flex items-center gap-2 transition-colors ${
+                          activeJobId === h.id
+                            ? "bg-accent"
+                            : "hover:bg-accent/50"
+                        }`}
+                      >
+                        <StatusBadge status={h.status} />
+                        <span className="truncate text-muted-foreground flex-1">
+                          {h.url}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </ScrollArea>
+              </CardContent>
+            </Card>
           )}
         </div>
 
         {/* Right panel: Results */}
         <div className="lg:col-span-8">
           {!activeJobId && (
-            <div className="bg-card border border-border rounded-lg p-12 text-center text-muted-foreground">
-              <div className="text-4xl mb-3 opacity-30">&#128375;</div>
-              <p>Enter a URL and hit Run Scrape to see results here</p>
-            </div>
+            <Card>
+              <CardContent className="p-12 text-center text-muted-foreground">
+                <FlaskConical className="size-10 mx-auto mb-3 opacity-30" />
+                <p>Enter a URL and hit Run Scrape to see results here</p>
+              </CardContent>
+            </Card>
           )}
 
           {activeJobId && jobLoading && (
-            <div className="bg-card border border-border rounded-lg p-12 text-center text-muted-foreground">
-              Loading...
-            </div>
+            <Card>
+              <CardContent className="p-6 space-y-3">
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-64 w-full" />
+              </CardContent>
+            </Card>
           )}
 
           {activeJobId && job && (
             <div className="space-y-4">
               {/* Status bar */}
-              <div className="bg-card border border-border rounded-lg p-3 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <StatusBadge status={job.status} />
-                  <span className="text-sm text-muted-foreground">
-                    {job.url}
-                  </span>
-                </div>
-                <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                  {job.pages_crawled > 0 && (
-                    <span>{job.pages_crawled} page(s)</span>
-                  )}
-                  {job.started_at && job.completed_at && (
-                    <span>
-                      {(
-                        (new Date(job.completed_at).getTime() -
-                          new Date(job.started_at).getTime()) /
-                        1000
-                      ).toFixed(1)}
-                      s total
+              <Card>
+                <CardContent className="p-3 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <StatusBadge status={job.status} />
+                    <span className="text-sm text-muted-foreground truncate">
+                      {job.url}
                     </span>
-                  )}
-                  <span className="text-[10px] font-mono opacity-50">
-                    {job.task_id.slice(0, 8)}
-                  </span>
-                </div>
-              </div>
+                  </div>
+                  <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                    {job.pages_crawled > 0 && (
+                      <Badge variant="secondary" className="text-xs">{job.pages_crawled} page(s)</Badge>
+                    )}
+                    {job.started_at && job.completed_at && (
+                      <span>
+                        {((new Date(job.completed_at).getTime() - new Date(job.started_at).getTime()) / 1000).toFixed(1)}s
+                      </span>
+                    )}
+                    <span className="text-[10px] font-mono opacity-50">
+                      {job.task_id.slice(0, 8)}
+                    </span>
+                  </div>
+                </CardContent>
+              </Card>
 
               {/* Loading states */}
               {(job.status === "queued" || job.status === "running") && (
-                <div className="bg-card border border-border rounded-lg p-8 text-center">
-                  <div className="inline-block w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin mb-3" />
-                  <p className="text-sm text-muted-foreground">
-                    {job.status === "queued"
-                      ? "Waiting for worker..."
-                      : "Scraping page..."}
-                  </p>
-                </div>
+                <Card>
+                  <CardContent className="p-8 text-center">
+                    <Loader2 className="size-6 text-primary mx-auto mb-3 animate-spin" />
+                    <p className="text-sm text-muted-foreground">
+                      {job.status === "queued" ? "Waiting for worker..." : "Scraping page..."}
+                    </p>
+                  </CardContent>
+                </Card>
               )}
 
               {/* Error */}
               {job.status === "failed" && job.error && (
-                <div className="bg-red-900/10 border border-red-900/30 rounded-lg p-4 text-sm text-red-400">
-                  <p className="font-medium mb-1">Scrape Failed</p>
-                  <p className="font-mono text-xs">{job.error}</p>
-                </div>
+                <Card className="border-destructive/30">
+                  <CardContent className="p-4">
+                    <p className="font-medium mb-1 text-destructive text-sm">Scrape Failed</p>
+                    <p className="font-mono text-xs text-destructive/80">{job.error}</p>
+                  </CardContent>
+                </Card>
               )}
 
               {/* Results */}
               {job.results.length > 0 && (
                 <>
-                  {/* Page selector for multi-page results */}
                   {job.results.length > 1 && (
                     <div className="flex gap-1 flex-wrap">
-                      {job.results.map((r, idx) => (
-                        <button
+                      {job.results.map((_, idx) => (
+                        <Button
                           key={idx}
+                          variant={activeResultIdx === idx ? "default" : "outline"}
+                          size="sm"
                           onClick={() => setActiveResultIdx(idx)}
-                          className={`px-2 py-1 rounded text-xs border transition-colors ${
-                            activeResultIdx === idx
-                              ? "bg-primary text-primary-foreground border-primary"
-                              : "bg-card border-border text-muted-foreground hover:text-foreground"
-                          }`}
+                          className="text-xs"
                         >
                           Page {idx + 1}
-                        </button>
+                        </Button>
                       ))}
                     </div>
                   )}
 
                   {currentResult && (
-                    <>
-                      {/* Tabs */}
-                      <div className="flex border-b border-border">
-                        {(
-                          [
-                            { key: "markdown", label: "Markdown" },
-                            { key: "metadata", label: "Metadata" },
-                            { key: "headings", label: "Headings" },
-                            { key: "raw", label: "Raw" },
-                          ] as { key: Tab; label: string }[]
-                        ).map((tab) => (
-                          <button
-                            key={tab.key}
-                            onClick={() => setActiveTab(tab.key)}
-                            className={`px-4 py-2 text-sm border-b-2 transition-colors ${
-                              activeTab === tab.key
-                                ? "border-primary text-foreground"
-                                : "border-transparent text-muted-foreground hover:text-foreground"
-                            }`}
-                          >
-                            {tab.label}
-                          </button>
-                        ))}
-                      </div>
+                    <Card>
+                      <CardContent className="p-0">
+                        <Tabs defaultValue="markdown">
+                          <TabsList className="m-4 mb-0">
+                            <TabsTrigger value="markdown">Markdown</TabsTrigger>
+                            <TabsTrigger value="metadata">Metadata</TabsTrigger>
+                            <TabsTrigger value="headings">Headings</TabsTrigger>
+                            <TabsTrigger value="raw">Raw</TabsTrigger>
+                          </TabsList>
 
-                      {/* Tab content */}
-                      <div className="bg-card border border-border rounded-lg">
-                        {activeTab === "markdown" && (
-                          <div className="p-4">
+                          <TabsContent value="markdown" className="p-4">
                             <div className="flex justify-between items-center mb-3">
                               <span className="text-xs text-muted-foreground">
                                 {currentResult.metadata.word_count} words |{" "}
                                 {currentResult.metadata.response_time_ms}ms
-                                {currentResult.metadata.used_proxy &&
-                                  " | via proxy"}
+                                {currentResult.metadata.used_proxy && " | via proxy"}
                               </span>
-                              <button
-                                onClick={() =>
-                                  navigator.clipboard.writeText(
-                                    currentResult.markdown,
-                                  )
-                                }
-                                className="text-xs text-primary hover:underline"
-                              >
-                                Copy Markdown
-                              </button>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => copyToClipboard(currentResult.markdown)}
+                                  >
+                                    <Copy className="size-3.5" />
+                                    Copy
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>Copy markdown</TooltipContent>
+                              </Tooltip>
                             </div>
-                            <div className="max-h-[600px] overflow-y-auto">
-                              <MarkdownViewer
-                                content={currentResult.markdown}
-                              />
-                            </div>
-                          </div>
-                        )}
+                            <ScrollArea className="max-h-[600px]">
+                              <MarkdownViewer content={currentResult.markdown} />
+                            </ScrollArea>
+                          </TabsContent>
 
-                        {activeTab === "metadata" && (
-                          <div className="p-4">
-                            <MetadataGrid
-                              metadata={currentResult.metadata}
-                              url={currentResult.url}
-                            />
-                          </div>
-                        )}
+                          <TabsContent value="metadata" className="p-4">
+                            <MetadataGrid metadata={currentResult.metadata} url={currentResult.url} />
+                          </TabsContent>
 
-                        {activeTab === "headings" && (
-                          <div className="p-4">
+                          <TabsContent value="headings" className="p-4">
                             {currentResult.metadata.headings.length === 0 ? (
-                              <p className="text-sm text-muted-foreground">
-                                No headings found
-                              </p>
+                              <p className="text-sm text-muted-foreground">No headings found</p>
                             ) : (
                               <ul className="space-y-1">
-                                {currentResult.metadata.headings.map(
-                                  (h, i) => (
-                                    <li
-                                      key={i}
-                                      className="text-sm text-muted-foreground font-mono"
-                                    >
-                                      {h}
-                                    </li>
-                                  ),
-                                )}
+                                {currentResult.metadata.headings.map((h, i) => (
+                                  <li key={i} className="text-sm text-muted-foreground font-mono">{h}</li>
+                                ))}
                               </ul>
                             )}
-                          </div>
-                        )}
+                          </TabsContent>
 
-                        {activeTab === "raw" && (
-                          <div className="p-4">
+                          <TabsContent value="raw" className="p-4">
                             <div className="flex justify-end mb-2">
-                              <button
-                                onClick={() =>
-                                  navigator.clipboard.writeText(
-                                    currentResult.markdown,
-                                  )
-                                }
-                                className="text-xs text-primary hover:underline"
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => copyToClipboard(currentResult.markdown)}
                               >
+                                <Copy className="size-3.5" />
                                 Copy
-                              </button>
+                              </Button>
                             </div>
-                            <pre className="text-xs font-mono text-muted-foreground bg-background p-3 rounded-md max-h-[600px] overflow-auto whitespace-pre-wrap break-words">
-                              {currentResult.markdown}
-                            </pre>
-                          </div>
-                        )}
-                      </div>
-                    </>
+                            <ScrollArea className="max-h-[600px]">
+                              <pre className="text-xs font-mono text-muted-foreground bg-muted p-3 rounded-md whitespace-pre-wrap break-words">
+                                {currentResult.markdown}
+                              </pre>
+                            </ScrollArea>
+                          </TabsContent>
+                        </Tabs>
+                      </CardContent>
+                    </Card>
                   )}
                 </>
               )}
@@ -423,16 +399,15 @@ function MetadataGrid({
         (item) =>
           item.value != null &&
           item.value !== "" && (
-            <div
-              key={item.label}
-              className="bg-background rounded-md p-2.5 border border-border"
-            >
-              <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-0.5">
-                {item.label}
-              </p>
-              <p className="text-sm break-all">{String(item.value)}</p>
-            </div>
-          ),
+            <Card key={item.label}>
+              <CardContent className="p-3">
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-0.5">
+                  {item.label}
+                </p>
+                <p className="text-sm break-all">{String(item.value)}</p>
+              </CardContent>
+            </Card>
+          )
       )}
     </div>
   );
