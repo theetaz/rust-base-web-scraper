@@ -2,6 +2,18 @@
 
 import { useStats } from "@/lib/api";
 import type { Job } from "@/lib/api";
+import { Card, CardContent } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
+import {
+  Layers,
+  Clock,
+  Loader2,
+  CheckCircle2,
+  XCircle,
+  Percent,
+  Timer,
+  FileText,
+} from "lucide-react";
 
 export function StatsCards({ jobs }: { jobs: Job[] }) {
   const { data: stats } = useStats();
@@ -19,30 +31,36 @@ export function StatsCards({ jobs }: { jobs: Job[] }) {
       : 0;
 
   const cards = [
-    { label: "Total Jobs", value: total, color: "text-foreground" },
-    { label: "Queued", value: `${queued} (${queueDepth} in Redis)`, color: "text-zinc-400" },
-    { label: "Running", value: running, color: "text-blue-400", pulse: running > 0 },
-    { label: "Completed", value: completed, color: "text-green-400" },
-    { label: "Failed", value: failed, color: "text-red-400" },
-    { label: "Success Rate", value: `${successRate}%`, color: "text-warning" },
-    { label: "Avg Response", value: `${avgTime.toFixed(0)}ms`, color: "text-foreground" },
-    { label: "Total Pages", value: stats?.jobs.total_pages_crawled ?? 0, color: "text-primary" },
+    { label: "Total Jobs", value: total, icon: Layers, color: "text-foreground" },
+    { label: "Queued", value: `${queued} (${queueDepth} in Redis)`, icon: Clock, color: "text-muted-foreground" },
+    { label: "Running", value: running, icon: Loader2, color: "text-primary", pulse: running > 0 },
+    { label: "Completed", value: completed, icon: CheckCircle2, color: "text-success" },
+    { label: "Failed", value: failed, icon: XCircle, color: "text-destructive" },
+    { label: "Success Rate", value: `${successRate}%`, icon: Percent, color: "text-warning" },
+    { label: "Avg Response", value: `${avgTime.toFixed(0)}ms`, icon: Timer, color: "text-foreground" },
+    { label: "Total Pages", value: stats?.jobs.total_pages_crawled ?? 0, icon: FileText, color: "text-primary" },
   ];
 
   return (
     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
       {cards.map((card) => (
-        <div
-          key={card.label}
-          className="bg-card border border-border rounded-lg p-3"
-        >
-          <p className="text-[11px] text-muted-foreground">{card.label}</p>
-          <p
-            className={`text-xl font-bold ${card.color} ${card.pulse ? "animate-pulse" : ""}`}
-          >
-            {card.value}
-          </p>
-        </div>
+        <Card key={card.label}>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2 mb-1">
+              <card.icon className={cn("size-3.5", card.color)} />
+              <p className="text-[11px] text-muted-foreground">{card.label}</p>
+            </div>
+            <p
+              className={cn(
+                "text-xl font-bold",
+                card.color,
+                card.pulse && "animate-pulse"
+              )}
+            >
+              {card.value}
+            </p>
+          </CardContent>
+        </Card>
       ))}
     </div>
   );

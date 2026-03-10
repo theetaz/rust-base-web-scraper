@@ -3,6 +3,13 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSubmitJob } from "@/lib/api";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Slider } from "@/components/ui/slider";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { toast } from "sonner";
+import { Loader2 } from "lucide-react";
 
 export function NewJobForm() {
   const router = useRouter();
@@ -22,98 +29,100 @@ export function NewJobForm() {
         limit,
         wait_seconds: waitSeconds,
       });
+      toast.success("Job submitted successfully");
       router.push(`/job/${result.task_id}`);
-    } catch {
-      // error is available via submitJob.error
+    } catch (err) {
+      toast.error(`Failed to submit: ${(err as Error).message}`);
     }
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6 max-w-lg">
-      <div>
-        <label className="block text-sm font-medium mb-1">URL</label>
-        <input
-          type="url"
-          value={url}
-          onChange={(e) => setUrl(e.target.value)}
-          placeholder="https://example.com/article"
-          required
-          className="w-full bg-card border border-border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-        />
-      </div>
+    <Card className="max-w-lg">
+      <CardHeader>
+        <CardTitle>Configure Scrape</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div className="space-y-2">
+            <Label htmlFor="url">URL</Label>
+            <Input
+              id="url"
+              type="url"
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              placeholder="https://example.com/article"
+              required
+            />
+          </div>
 
-      <div>
-        <label className="block text-sm font-medium mb-1">Mode</label>
-        <div className="flex gap-2">
-          {["scrape", "crawl", "http"].map((m) => (
-            <button
-              key={m}
-              type="button"
-              onClick={() => setMode(m)}
-              className={`px-4 py-2 rounded-md text-sm border transition-colors ${
-                mode === m
-                  ? "bg-primary text-primary-foreground border-primary"
-                  : "bg-card border-border text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              {m === "scrape"
-                ? "Scrape (single page)"
-                : m === "crawl"
-                  ? "Crawl (follow links)"
-                  : "HTTP (no browser)"}
-            </button>
-          ))}
-        </div>
-      </div>
+          <div className="space-y-2">
+            <Label>Mode</Label>
+            <div className="flex gap-2">
+              {(["scrape", "crawl", "http"] as const).map((m) => (
+                <Button
+                  key={m}
+                  type="button"
+                  variant={mode === m ? "default" : "outline"}
+                  onClick={() => setMode(m)}
+                  className="flex-1"
+                >
+                  {m === "scrape"
+                    ? "Scrape (single)"
+                    : m === "crawl"
+                      ? "Crawl (links)"
+                      : "HTTP (no browser)"}
+                </Button>
+              ))}
+            </div>
+          </div>
 
-      {mode !== "scrape" && (
-        <div>
-          <label className="block text-sm font-medium mb-1">
-            Page Limit: {limit}
-          </label>
-          <input
-            type="range"
-            min={1}
-            max={100}
-            value={limit}
-            onChange={(e) => setLimit(Number(e.target.value))}
-            className="w-full accent-primary"
-          />
-        </div>
-      )}
+          {mode !== "scrape" && (
+            <div className="space-y-2">
+              <Label>Page Limit: {limit}</Label>
+              <Slider
+                value={[limit]}
+                onValueChange={([v]) => setLimit(v)}
+                min={1}
+                max={100}
+                step={1}
+              />
+            </div>
+          )}
 
-      {mode !== "http" && (
-        <div>
-          <label className="block text-sm font-medium mb-1">
-            Wait Time: {waitSeconds}s
-          </label>
-          <input
-            type="range"
-            min={1}
-            max={15}
-            value={waitSeconds}
-            onChange={(e) => setWaitSeconds(Number(e.target.value))}
-            className="w-full accent-primary"
-          />
-          <p className="text-xs text-muted-foreground mt-1">
-            Extra wait for JS rendering
-          </p>
-        </div>
-      )}
+          {mode !== "http" && (
+            <div className="space-y-2">
+              <Label>Wait Time: {waitSeconds}s</Label>
+              <Slider
+                value={[waitSeconds]}
+                onValueChange={([v]) => setWaitSeconds(v)}
+                min={1}
+                max={15}
+                step={1}
+              />
+              <p className="text-xs text-muted-foreground">
+                Extra wait for JS rendering
+              </p>
+            </div>
+          )}
 
-      {submitJob.error && (
-        <p className="text-destructive text-sm">
-          {(submitJob.error as Error).message}
-        </p>
-      )}
+          {submitJob.error && (
+            <p className="text-destructive text-sm">
+              {(submitJob.error as Error).message}
+            </p>
+          )}
 
-      <button
-        type="submit"
-        disabled={submitJob.isPending}
-        className="bg-primary text-primary-foreground px-6 py-2 rounded-md text-sm font-medium hover:opacity-90 disabled:opacity-50 transition-opacity"
-      >
-        {submitJob.isPending ? "Submitting..." : "Start Scrape"}
-      </button>
-    </form>
+          <Button type="submit" disabled={submitJob.isPending} className="w-full">
+            {submitJob.isPending ? (
+              <>
+                <Loader2 className="size-4 animate-spin" />
+                Submitting...
+              </>
+            ) : (
+              "Start Scrape"
+            )}
+          </Button>
+        </form>
+      </CardContent>
+    </Card>
   );
 }

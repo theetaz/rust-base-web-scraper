@@ -5,6 +5,29 @@ import Link from "next/link";
 import type { Job } from "@/lib/api";
 import { StatusBadge } from "./status-badge";
 import { useDeleteJob } from "@/lib/api";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { ArrowUpDown, Search, ExternalLink, Trash2 } from "lucide-react";
+import { toast } from "sonner";
 
 type SortKey = "created_at" | "status" | "mode" | "pages_crawled";
 
@@ -36,60 +59,56 @@ export function JobTable({ jobs }: { jobs: Job[] }) {
       (j) =>
         !search ||
         j.url.toLowerCase().includes(search.toLowerCase()) ||
-        j.id.toLowerCase().includes(search.toLowerCase()),
+        j.id.toLowerCase().includes(search.toLowerCase())
     )
     .sort((a, b) => {
       let cmp = 0;
-      if (sortKey === "created_at") {
-        cmp = a.created_at.localeCompare(b.created_at);
-      } else if (sortKey === "status") {
-        cmp = a.status.localeCompare(b.status);
-      } else if (sortKey === "mode") {
-        cmp = a.mode.localeCompare(b.mode);
-      } else if (sortKey === "pages_crawled") {
-        cmp = (a.pages_crawled ?? 0) - (b.pages_crawled ?? 0);
-      }
+      if (sortKey === "created_at") cmp = a.created_at.localeCompare(b.created_at);
+      else if (sortKey === "status") cmp = a.status.localeCompare(b.status);
+      else if (sortKey === "mode") cmp = a.mode.localeCompare(b.mode);
+      else if (sortKey === "pages_crawled") cmp = (a.pages_crawled ?? 0) - (b.pages_crawled ?? 0);
       return sortDesc ? -cmp : cmp;
     });
 
   const handleSort = (key: SortKey) => {
-    if (sortKey === key) {
-      setSortDesc(!sortDesc);
-    } else {
+    if (sortKey === key) setSortDesc(!sortDesc);
+    else {
       setSortKey(key);
       setSortDesc(true);
     }
   };
 
-  const SortIcon = ({ column }: { column: SortKey }) =>
-    sortKey === column ? (
-      <span className="ml-1 text-[10px]">{sortDesc ? "v" : "^"}</span>
-    ) : null;
+  const handleDelete = (id: string) => {
+    deleteJob.mutate(id, {
+      onSuccess: () => toast.success("Job deleted"),
+      onError: (err) => toast.error(`Delete failed: ${err.message}`),
+    });
+  };
 
   return (
     <div className="space-y-3">
-      {/* Filters */}
       <div className="flex items-center gap-3 flex-wrap">
-        <input
-          type="text"
-          placeholder="Search URL or ID..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="bg-card border border-border rounded-md px-3 py-1.5 text-sm w-64 focus:outline-none focus:ring-2 focus:ring-primary"
-        />
+        <div className="relative">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+          <Input
+            type="text"
+            placeholder="Search URL or ID..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-9 w-64"
+          />
+        </div>
         <div className="flex gap-1">
           {["all", "queued", "running", "completed", "failed"].map((s) => (
-            <button
+            <Button
               key={s}
+              variant={statusFilter === s ? "default" : "outline"}
+              size="sm"
               onClick={() => setStatusFilter(s)}
-              className={`px-2.5 py-1 rounded text-xs border transition-colors ${
-                statusFilter === s
-                  ? "bg-primary text-primary-foreground border-primary"
-                  : "bg-card border-border text-muted-foreground hover:text-foreground"
-              }`}
+              className="text-xs capitalize"
             >
               {s}
-            </button>
+            </Button>
           ))}
         </div>
         <span className="text-xs text-muted-foreground ml-auto">
@@ -97,132 +116,126 @@ export function JobTable({ jobs }: { jobs: Job[] }) {
         </span>
       </div>
 
-      {/* Table */}
-      <div className="overflow-x-auto border border-border rounded-lg">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-border bg-card">
-              <Th onClick={() => handleSort("status")}>
-                Status
-                <SortIcon column="status" />
-              </Th>
-              <th className="text-left p-3 text-muted-foreground font-medium">
-                URL
-              </th>
-              <Th onClick={() => handleSort("mode")}>
-                Mode
-                <SortIcon column="mode" />
-              </Th>
-              <Th onClick={() => handleSort("pages_crawled")}>
-                Pages
-                <SortIcon column="pages_crawled" />
-              </Th>
-              <Th onClick={() => handleSort("created_at")}>
-                Created
-                <SortIcon column="created_at" />
-              </Th>
-              <th className="text-left p-3 text-muted-foreground font-medium">
-                Duration
-              </th>
-              <th className="text-left p-3 text-muted-foreground font-medium">
-                Actions
-              </th>
-            </tr>
-          </thead>
-          <tbody>
+      <div className="rounded-lg border">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead
+                className="cursor-pointer select-none"
+                onClick={() => handleSort("status")}
+              >
+                <span className="inline-flex items-center gap-1">
+                  Status <ArrowUpDown className="size-3" />
+                </span>
+              </TableHead>
+              <TableHead>URL</TableHead>
+              <TableHead
+                className="cursor-pointer select-none"
+                onClick={() => handleSort("mode")}
+              >
+                <span className="inline-flex items-center gap-1">
+                  Mode <ArrowUpDown className="size-3" />
+                </span>
+              </TableHead>
+              <TableHead
+                className="cursor-pointer select-none"
+                onClick={() => handleSort("pages_crawled")}
+              >
+                <span className="inline-flex items-center gap-1">
+                  Pages <ArrowUpDown className="size-3" />
+                </span>
+              </TableHead>
+              <TableHead
+                className="cursor-pointer select-none"
+                onClick={() => handleSort("created_at")}
+              >
+                <span className="inline-flex items-center gap-1">
+                  Created <ArrowUpDown className="size-3" />
+                </span>
+              </TableHead>
+              <TableHead>Duration</TableHead>
+              <TableHead>Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {filtered.map((job) => {
               const duration =
                 job.started_at && job.completed_at
-                  ? (
-                      (new Date(job.completed_at).getTime() -
-                        new Date(job.started_at).getTime()) /
-                      1000
-                    ).toFixed(1) + "s"
+                  ? ((new Date(job.completed_at).getTime() - new Date(job.started_at).getTime()) / 1000).toFixed(1) + "s"
                   : job.started_at
                     ? "..."
                     : "-";
               return (
-                <tr
-                  key={job.id}
-                  className="border-b border-border hover:bg-accent/50 transition-colors"
-                >
-                  <td className="p-3">
+                <TableRow key={job.id}>
+                  <TableCell>
                     <StatusBadge status={job.status} />
-                  </td>
-                  <td className="p-3">
+                  </TableCell>
+                  <TableCell>
                     <Link
                       href={`/job/${job.id}`}
                       className="text-primary hover:underline truncate block max-w-xs"
                       title={job.url}
                     >
-                      {job.url.length > 55
-                        ? job.url.substring(0, 55) + "..."
-                        : job.url}
+                      {job.url.length > 55 ? job.url.substring(0, 55) + "..." : job.url}
                     </Link>
                     <span className="text-[10px] font-mono text-muted-foreground">
                       {job.id.slice(0, 8)}
                     </span>
-                  </td>
-                  <td className="p-3 text-muted-foreground">{job.mode}</td>
-                  <td className="p-3 text-muted-foreground">
-                    {job.pages_crawled ?? 0}
-                  </td>
-                  <td className="p-3 text-muted-foreground text-xs">
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">{job.mode}</TableCell>
+                  <TableCell className="text-muted-foreground">{job.pages_crawled ?? 0}</TableCell>
+                  <TableCell className="text-muted-foreground text-xs">
                     {new Date(job.created_at).toLocaleString()}
-                  </td>
-                  <td className="p-3 text-muted-foreground text-xs font-mono">
+                  </TableCell>
+                  <TableCell className="text-muted-foreground text-xs font-mono">
                     {duration}
-                  </td>
-                  <td className="p-3 flex gap-2">
-                    <Link
-                      href={`/job/${job.id}`}
-                      className="text-xs text-primary hover:underline"
-                    >
-                      View
-                    </Link>
-                    <button
-                      onClick={() => {
-                        if (confirm("Delete this job?"))
-                          deleteJob.mutate(job.id);
-                      }}
-                      className="text-xs text-destructive hover:underline"
-                    >
-                      Delete
-                    </button>
-                  </td>
-                </tr>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex gap-2">
+                      <Button variant="ghost" size="sm" asChild>
+                        <Link href={`/job/${job.id}`}>
+                          <ExternalLink className="size-3.5" />
+                        </Link>
+                      </Button>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive">
+                            <Trash2 className="size-3.5" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Delete Job</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              This will permanently delete this job and all its results. This action cannot be undone.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={() => handleDelete(job.id)}
+                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            >
+                              Delete
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </div>
+                  </TableCell>
+                </TableRow>
               );
             })}
             {filtered.length === 0 && (
-              <tr>
-                <td
-                  colSpan={7}
-                  className="p-6 text-center text-muted-foreground"
-                >
+              <TableRow>
+                <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
                   No jobs matching filters
-                </td>
-              </tr>
+                </TableCell>
+              </TableRow>
             )}
-          </tbody>
-        </table>
+          </TableBody>
+        </Table>
       </div>
     </div>
-  );
-}
-
-function Th({
-  children,
-  onClick,
-}: {
-  children: React.ReactNode;
-  onClick: () => void;
-}) {
-  return (
-    <th
-      onClick={onClick}
-      className="text-left p-3 text-muted-foreground font-medium cursor-pointer hover:text-foreground select-none"
-    >
-      {children}
-    </th>
   );
 }
