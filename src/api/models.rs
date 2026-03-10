@@ -11,6 +11,8 @@ pub struct ScrapeRequest {
     pub limit: i32,
     #[serde(default = "default_wait")]
     pub wait_seconds: i32,
+    #[serde(default)]
+    pub main_content: bool,
 }
 
 fn default_mode() -> String {
