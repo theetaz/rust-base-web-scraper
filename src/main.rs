@@ -52,6 +52,10 @@ enum Commands {
         /// Extra wait time in seconds for JS-heavy pages
         #[arg(short, long, default_value = "3")]
         wait: u64,
+
+        /// Extract only main content (strips nav, sidebar, footer, ads)
+        #[arg(short = 'M', long)]
+        main_content: bool,
     },
 }
 
@@ -75,7 +79,8 @@ async fn main() {
             browser,
             scrape,
             wait,
-        } => run_cli(url, limit, output, browser, scrape, wait).await,
+            main_content,
+        } => run_cli(url, limit, output, browser, scrape, wait, main_content).await,
     }
 }
 
@@ -119,7 +124,7 @@ async fn run_server() {
     axum::serve(listener, app).await.expect("Server error");
 }
 
-async fn run_cli(url: String, limit: u32, output: String, browser: bool, scrape: bool, wait: u64) {
+async fn run_cli(url: String, limit: u32, output: String, browser: bool, scrape: bool, wait: u64, main_content: bool) {
     use std::fs;
     use std::path::Path;
 
@@ -139,7 +144,7 @@ async fn run_cli(url: String, limit: u32, output: String, browser: bool, scrape:
     let results = if scrape {
         let proxy_ref = proxy.as_deref().map(String::from);
         tokio::task::spawn_blocking(move || {
-            crawler::scrape_single(&url, wait, proxy_ref.as_deref(), &proxy_mode, &retry)
+            crawler::scrape_single(&url, wait, proxy_ref.as_deref(), &proxy_mode, &retry, main_content)
         })
             .await
             .expect("Task panicked")
@@ -147,13 +152,13 @@ async fn run_cli(url: String, limit: u32, output: String, browser: bool, scrape:
     } else if browser {
         let proxy_ref = proxy.as_deref().map(String::from);
         tokio::task::spawn_blocking(move || {
-            crawler::crawl_browser(&url, limit, wait, proxy_ref.as_deref(), &proxy_mode, &retry)
+            crawler::crawl_browser(&url, limit, wait, proxy_ref.as_deref(), &proxy_mode, &retry, main_content)
         })
             .await
             .expect("Task panicked")
             .expect("Crawl failed")
     } else {
-        crawler::crawl_http(&url, limit).await
+        crawler::crawl_http(&url, limit, main_content).await
     };
 
     println!("Crawled {} pages", results.len());
