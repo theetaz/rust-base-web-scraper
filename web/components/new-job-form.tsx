@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
+import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
@@ -19,6 +20,7 @@ export function NewJobForm() {
   const [mode, setMode] = useState("scrape");
   const [limit, setLimit] = useState(10);
   const [waitSeconds, setWaitSeconds] = useState(3);
+  const [mainContent, setMainContent] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -28,6 +30,7 @@ export function NewJobForm() {
         mode,
         limit,
         wait_seconds: waitSeconds,
+        main_content: mainContent,
       });
       toast.success("Job submitted successfully");
       router.push(`/job/${result.task_id}`);
@@ -104,6 +107,20 @@ export function NewJobForm() {
               </p>
             </div>
           )}
+
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5">
+              <Label htmlFor="main-content">Main Content Only</Label>
+              <p className="text-xs text-muted-foreground">
+                Extract only the core article content
+              </p>
+            </div>
+            <Switch
+              id="main-content"
+              checked={mainContent}
+              onCheckedChange={setMainContent}
+            />
+          </div>
 
           {submitJob.error && (
             <p className="text-destructive text-sm">
