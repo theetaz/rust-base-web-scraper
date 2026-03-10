@@ -29,6 +29,32 @@ impl ProxyMode {
 }
 
 #[derive(Clone, Debug)]
+pub struct RetryConfig {
+    pub direct_retries: u32,
+    pub proxy_retries: u32,
+    pub retry_delay_secs: u64,
+}
+
+impl RetryConfig {
+    fn from_env() -> Self {
+        Self {
+            direct_retries: env::var("DIRECT_RETRIES")
+                .ok()
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(1),
+            proxy_retries: env::var("PROXY_RETRIES")
+                .ok()
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(1),
+            retry_delay_secs: env::var("RETRY_DELAY_SECS")
+                .ok()
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(20),
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
 pub struct Config {
     pub port: u16,
     pub redis_url: String,
@@ -36,6 +62,7 @@ pub struct Config {
     pub proxy_url: Option<String>,
     pub proxy_mode: ProxyMode,
     pub max_workers: usize,
+    pub retry: RetryConfig,
 }
 
 impl Config {
@@ -57,6 +84,7 @@ impl Config {
                 .ok()
                 .and_then(|v| v.parse().ok())
                 .unwrap_or(3),
+            retry: RetryConfig::from_env(),
         }
     }
 
