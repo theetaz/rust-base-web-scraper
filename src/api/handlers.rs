@@ -34,6 +34,7 @@ pub async fn submit_scrape(
         &req.mode,
         req.limit,
         req.wait_seconds,
+        req.main_content,
     )
     .await?;
 
