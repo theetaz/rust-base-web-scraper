@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
+import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -28,6 +29,7 @@ export default function PlaygroundPage() {
   const [mode, setMode] = useState("scrape");
   const [limit, setLimit] = useState(10);
   const [waitSeconds, setWaitSeconds] = useState(3);
+  const [mainContent, setMainContent] = useState(false);
   const [activeJobId, setActiveJobId] = useState<string | null>(null);
   const [activeResultIdx, setActiveResultIdx] = useState(0);
   const [history, setHistory] = useState<
@@ -44,6 +46,7 @@ export default function PlaygroundPage() {
         mode,
         limit,
         wait_seconds: waitSeconds,
+        main_content: mainContent,
       });
       setActiveJobId(result.task_id);
       setActiveResultIdx(0);
@@ -142,6 +145,14 @@ export default function PlaygroundPage() {
                   )}
                 </div>
 
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs">Main Content Only</Label>
+                  <Switch
+                    checked={mainContent}
+                    onCheckedChange={setMainContent}
+                  />
+                </div>
+
                 {submitJob.error && (
                   <p className="text-destructive text-xs">
                     {(submitJob.error as Error).message}
@@ -178,11 +189,10 @@ export default function PlaygroundPage() {
                           setActiveJobId(h.id);
                           setActiveResultIdx(0);
                         }}
-                        className={`w-full text-left px-2 py-1.5 rounded text-xs flex items-center gap-2 transition-colors ${
-                          activeJobId === h.id
+                        className={`w-full text-left px-2 py-1.5 rounded text-xs flex items-center gap-2 transition-colors ${activeJobId === h.id
                             ? "bg-accent"
                             : "hover:bg-accent/50"
-                        }`}
+                          }`}
                       >
                         <StatusBadge status={h.status} />
                         <span className="truncate text-muted-foreground flex-1">
