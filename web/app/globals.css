@@ -1,24 +1,52 @@
 @import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
 
 @theme inline {
-  --color-background: #09090b;
-  --color-foreground: #fafafa;
-  --color-card: #0a0a0f;
-  --color-card-foreground: #fafafa;
-  --color-muted: #1a1a2e;
-  --color-muted-foreground: #a1a1aa;
-  --color-border: #27272a;
-  --color-primary: #3b82f6;
-  --color-primary-foreground: #ffffff;
-  --color-destructive: #ef4444;
-  --color-accent: #1e1e3a;
-  --color-accent-foreground: #fafafa;
-  --color-success: #22c55e;
-  --color-warning: #f59e0b;
+  --radius: 0.625rem;
+  --color-background: oklch(0.141 0.005 285.823);
+  --color-foreground: oklch(0.985 0 0);
+  --color-card: oklch(0.141 0.005 285.823);
+  --color-card-foreground: oklch(0.985 0 0);
+  --color-popover: oklch(0.141 0.005 285.823);
+  --color-popover-foreground: oklch(0.985 0 0);
+  --color-primary: oklch(0.546 0.245 262.881);
+  --color-primary-foreground: oklch(0.985 0 0);
+  --color-secondary: oklch(0.218 0.006 285.885);
+  --color-secondary-foreground: oklch(0.985 0 0);
+  --color-muted: oklch(0.218 0.006 285.885);
+  --color-muted-foreground: oklch(0.632 0.014 264.436);
+  --color-accent: oklch(0.218 0.006 285.885);
+  --color-accent-foreground: oklch(0.985 0 0);
+  --color-destructive: oklch(0.577 0.245 27.325);
+  --color-destructive-foreground: oklch(0.985 0 0);
+  --color-border: oklch(0.274 0.006 286.033);
+  --color-input: oklch(0.274 0.006 286.033);
+  --color-ring: oklch(0.546 0.245 262.881);
+  --color-chart-1: oklch(0.488 0.243 264.376);
+  --color-chart-2: oklch(0.696 0.17 162.48);
+  --color-chart-3: oklch(0.769 0.188 70.08);
+  --color-chart-4: oklch(0.627 0.265 303.9);
+  --color-chart-5: oklch(0.645 0.246 16.439);
+  --color-sidebar: oklch(0.141 0.005 285.823);
+  --color-sidebar-foreground: oklch(0.985 0 0);
+  --color-sidebar-primary: oklch(0.546 0.245 262.881);
+  --color-sidebar-primary-foreground: oklch(0.985 0 0);
+  --color-sidebar-accent: oklch(0.218 0.006 285.885);
+  --color-sidebar-accent-foreground: oklch(0.985 0 0);
+  --color-sidebar-border: oklch(0.274 0.006 286.033);
+  --color-sidebar-ring: oklch(0.546 0.245 262.881);
+  --color-success: oklch(0.627 0.194 149.214);
+  --color-warning: oklch(0.752 0.183 55.934);
 }
 
-body {
-  background-color: var(--color-background);
-  color: var(--color-foreground);
-  font-family: system-ui, -apple-system, sans-serif;
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-family: system-ui, -apple-system, sans-serif;
+  }
 }
