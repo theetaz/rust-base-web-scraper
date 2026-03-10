@@ -63,6 +63,7 @@ pub struct Job {
     pub created_at: String,
     pub started_at: Option<String>,
     pub completed_at: Option<String>,
+    pub main_content: Option<bool>,
 }
 
 #[derive(Debug, sqlx::FromRow, serde::Serialize)]
@@ -94,16 +95,18 @@ pub async fn create_job(
     mode: &str,
     page_limit: i32,
     wait_seconds: i32,
+    main_content: bool,
 ) -> Result<Job, CrawlError> {
     let now = chrono::Utc::now().to_rfc3339();
     sqlx::query(
-        "INSERT INTO jobs (id, url, mode, page_limit, wait_seconds, status, created_at) VALUES (?, ?, ?, ?, ?, 'queued', ?)"
+        "INSERT INTO jobs (id, url, mode, page_limit, wait_seconds, main_content, status, created_at) VALUES (?, ?, ?, ?, ?, ?, 'queued', ?)"
     )
     .bind(id)
     .bind(url)
     .bind(mode)
     .bind(page_limit)
     .bind(wait_seconds)
+    .bind(main_content)
     .bind(&now)
     .execute(pool)
     .await?;
