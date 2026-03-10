@@ -36,3 +36,5 @@ CREATE TABLE IF NOT EXISTS results (
 CREATE INDEX IF NOT EXISTS idx_jobs_status ON jobs(status);
 CREATE INDEX IF NOT EXISTS idx_jobs_created ON jobs(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_results_job ON results(job_id);
+
+ALTER TABLE jobs ADD COLUMN main_content BOOLEAN DEFAULT FALSE;
