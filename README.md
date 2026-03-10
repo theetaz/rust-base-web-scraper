@@ -45,8 +45,8 @@ A production-grade, self-hosted web scraping API built in Rust with a Next.js da
 
 ```bash
 # Clone the repository
-git clone https://github.com/theetaz/spider-web-crawler.git
-cd spider-web-crawler
+git clone https://github.com/theetaz/rust-base-web-scraper.git
+cd rust-base-web-scraper
 
 # Copy environment config
 cp .env.example .env

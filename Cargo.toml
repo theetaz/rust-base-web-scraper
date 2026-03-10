@@ -4,7 +4,7 @@ version = "0.2.0"
 edition = "2021"
 description = "Production-grade web scraping API with stealth browser automation, background job processing, and real-time dashboard"
 license = "MIT"
-repository = "https://github.com/theetaz/spider-web-crawler"
+repository = "https://github.com/theetaz/rust-base-web-scraper"
 authors = ["Nipun Theekshana <theekshana2@gmail.com>"]
 
 [dependencies]
