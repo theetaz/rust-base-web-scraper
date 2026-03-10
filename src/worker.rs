@@ -51,23 +51,24 @@ async fn worker_loop(pool: Arc<SqlitePool>, config: Arc<Config>, worker_id: usiz
         let proxy = config.proxy_url.clone();
         let proxy_mode = config.proxy_mode.clone();
         let retry = config.retry.clone();
+        let main_content = job.main_content.unwrap_or(false);
 
         let result = match mode.as_str() {
             "scrape" => {
                 let proxy_ref = proxy.as_deref().map(String::from);
                 tokio::task::spawn_blocking(move || {
-                    crawler::scrape_single(&url, wait, proxy_ref.as_deref(), &proxy_mode, &retry)
+                    crawler::scrape_single(&url, wait, proxy_ref.as_deref(), &proxy_mode, &retry, main_content)
                 })
                 .await
             }
             "crawl" => {
                 let proxy_ref = proxy.as_deref().map(String::from);
                 tokio::task::spawn_blocking(move || {
-                    crawler::crawl_browser(&url, limit, wait, proxy_ref.as_deref(), &proxy_mode, &retry)
+                    crawler::crawl_browser(&url, limit, wait, proxy_ref.as_deref(), &proxy_mode, &retry, main_content)
                 })
                 .await
             }
-            "http" => Ok(Ok(crawler::crawl_http(&url, limit).await)),
+            "http" => Ok(Ok(crawler::crawl_http(&url, limit, main_content).await)),
             _ => Ok(Err("Unknown mode".to_string())),
         };
 
