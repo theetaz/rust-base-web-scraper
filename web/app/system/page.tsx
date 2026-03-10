@@ -57,7 +57,7 @@ export default function SystemPage() {
                 label="Proxy"
                 value={
                   system.config.proxy_configured
-                    ? "Configured"
+                    ? `Configured (${system.config.proxy_mode})`
                     : "Not configured"
                 }
                 warn={!system.config.proxy_configured}

@@ -131,13 +131,23 @@ async fn run_cli(url: String, limit: u32, output: String, browser: bool, scrape:
     println!("Output dir: {}", output);
     println!("Browser mode: {}", browser || scrape);
 
+    let cfg = config::Config::from_env();
+    let proxy = cfg.proxy_url.clone();
+    let proxy_mode = cfg.proxy_mode.clone();
+
     let results = if scrape {
-        tokio::task::spawn_blocking(move || crawler::scrape_single(&url, wait, None))
+        let proxy_ref = proxy.as_deref().map(String::from);
+        tokio::task::spawn_blocking(move || {
+            crawler::scrape_single(&url, wait, proxy_ref.as_deref(), &proxy_mode)
+        })
             .await
             .expect("Task panicked")
             .expect("Scrape failed")
     } else if browser {
-        tokio::task::spawn_blocking(move || crawler::crawl_browser(&url, limit, wait, None))
+        let proxy_ref = proxy.as_deref().map(String::from);
+        tokio::task::spawn_blocking(move || {
+            crawler::crawl_browser(&url, limit, wait, proxy_ref.as_deref(), &proxy_mode)
+        })
             .await
             .expect("Task panicked")
             .expect("Crawl failed")

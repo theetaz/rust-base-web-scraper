@@ -71,6 +71,20 @@ PROXY_PASSWORD=your_password
 PROXY_PROTOCOL=http  # or socks5
 ```
 
+#### Proxy Mode
+
+Control when the proxy is used with the `PROXY_MODE` environment variable:
+
+| Mode | Description |
+|------|-------------|
+| `fallback` | Try direct first, use proxy only when blocked (default) |
+| `always` | Route all requests through the proxy |
+| `never` | Never use proxy, even if configured |
+
+```env
+PROXY_MODE=fallback  # default
+```
+
 Restart the API container to apply:
 
 ```bash

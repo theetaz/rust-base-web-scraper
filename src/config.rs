@@ -1,4 +1,32 @@
 use std::env;
+use std::fmt;
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum ProxyMode {
+    Always,
+    Fallback,
+    Never,
+}
+
+impl fmt::Display for ProxyMode {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ProxyMode::Always => write!(f, "always"),
+            ProxyMode::Fallback => write!(f, "fallback"),
+            ProxyMode::Never => write!(f, "never"),
+        }
+    }
+}
+
+impl ProxyMode {
+    fn from_env() -> Self {
+        match env::var("PROXY_MODE").unwrap_or_default().to_lowercase().as_str() {
+            "always" => ProxyMode::Always,
+            "never" => ProxyMode::Never,
+            _ => ProxyMode::Fallback,
+        }
+    }
+}
 
 #[derive(Clone, Debug)]
 pub struct Config {
@@ -6,12 +34,14 @@ pub struct Config {
     pub redis_url: String,
     pub database_url: String,
     pub proxy_url: Option<String>,
+    pub proxy_mode: ProxyMode,
     pub max_workers: usize,
 }
 
 impl Config {
     pub fn from_env() -> Self {
         let proxy_url = Self::build_proxy_url();
+        let proxy_mode = ProxyMode::from_env();
 
         Self {
             port: env::var("PORT")
@@ -22,6 +52,7 @@ impl Config {
             database_url: env::var("DATABASE_URL")
                 .unwrap_or_else(|_| "sqlite://spider.db".into()),
             proxy_url,
+            proxy_mode,
             max_workers: env::var("MAX_WORKERS")
                 .ok()
                 .and_then(|v| v.parse().ok())

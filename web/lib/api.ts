@@ -104,6 +104,7 @@ export interface SystemConfig {
   port: number;
   max_workers: number;
   proxy_configured: boolean;
+  proxy_mode: string;
   database_url: string;
   redis_url: string;
 }

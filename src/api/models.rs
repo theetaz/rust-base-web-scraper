@@ -118,6 +118,7 @@ pub struct SystemConfig {
     pub port: u16,
     pub max_workers: usize,
     pub proxy_configured: bool,
+    pub proxy_mode: String,
     pub database_url: String,
     pub redis_url: String,
 }

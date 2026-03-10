@@ -146,6 +146,7 @@ pub async fn get_system_info(
         port: state.config.port,
         max_workers: state.config.max_workers,
         proxy_configured: state.config.is_proxy_configured(),
+        proxy_mode: state.config.proxy_mode.to_string(),
         database_url: state.config.safe_database_url(),
         redis_url: state.config.safe_redis_url(),
     };

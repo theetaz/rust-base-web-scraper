@@ -7,6 +7,7 @@ use std::collections::{HashSet, VecDeque};
 use std::time::Instant;
 use url::Url;
 
+use crate::config::ProxyMode;
 use crate::metadata::{self, PageMetadata};
 use crate::proxy;
 use crate::stealth::{self, StealthConfig};
@@ -24,38 +25,55 @@ pub fn scrape_single(
     url: &str,
     wait_secs: u64,
     proxy_url: Option<&str>,
+    proxy_mode: &ProxyMode,
 ) -> Result<Vec<CrawlResult>, String> {
     let start = Instant::now();
     let used_proxy;
     let html;
 
-    // Try direct, then proxy fallback
-    let config = StealthConfig::default();
-    let browser = stealth::launch_stealth_browser(&config)?;
-    let tab = browser.new_tab().map_err(|e| format!("New tab: {}", e))?;
-    stealth::apply_stealth(&tab, &config)?;
-    let direct_html = stealth::navigate_stealth(&tab, url, wait_secs, &config)?;
+    let use_proxy_directly = *proxy_mode == ProxyMode::Always && proxy_url.is_some();
 
-    if !proxy::is_blocked(&direct_html, None) {
-        html = direct_html;
-        used_proxy = false;
+    if use_proxy_directly {
+        // Always mode: go straight through proxy
+        let p = proxy_url.unwrap();
+        let config = StealthConfig::default().with_proxy(Some(p.to_string()));
+        let browser = stealth::launch_stealth_browser(&config)?;
+        let tab = browser.new_tab().map_err(|e| format!("New tab (proxy): {}", e))?;
+        stealth::apply_stealth(&tab, &config)?;
+        html = stealth::navigate_stealth(&tab, url, wait_secs, &config)?;
+        used_proxy = true;
     } else {
-        drop(tab);
-        drop(browser);
-        tracing::warn!("Blocked on direct attempt for {}", url);
-        if let Some(p) = proxy_url {
-            let config = StealthConfig::default().with_proxy(Some(p.to_string()));
-            let browser = stealth::launch_stealth_browser(&config)?;
-            let tab = browser.new_tab().map_err(|e| format!("New tab (proxy): {}", e))?;
-            stealth::apply_stealth(&tab, &config)?;
-            let proxy_html = stealth::navigate_stealth(&tab, url, wait_secs, &config)?;
-            if proxy::is_blocked(&proxy_html, None) {
-                return Err(format!("Still blocked after proxy retry for {}", url));
+        // Direct attempt first (fallback or never mode)
+        let config = StealthConfig::default();
+        let browser = stealth::launch_stealth_browser(&config)?;
+        let tab = browser.new_tab().map_err(|e| format!("New tab: {}", e))?;
+        stealth::apply_stealth(&tab, &config)?;
+        let direct_html = stealth::navigate_stealth(&tab, url, wait_secs, &config)?;
+
+        if !proxy::is_blocked(&direct_html, None) {
+            html = direct_html;
+            used_proxy = false;
+        } else if *proxy_mode == ProxyMode::Fallback {
+            drop(tab);
+            drop(browser);
+            tracing::warn!("Blocked on direct attempt for {}", url);
+            if let Some(p) = proxy_url {
+                let config = StealthConfig::default().with_proxy(Some(p.to_string()));
+                let browser = stealth::launch_stealth_browser(&config)?;
+                let tab = browser.new_tab().map_err(|e| format!("New tab (proxy): {}", e))?;
+                stealth::apply_stealth(&tab, &config)?;
+                let proxy_html = stealth::navigate_stealth(&tab, url, wait_secs, &config)?;
+                if proxy::is_blocked(&proxy_html, None) {
+                    return Err(format!("Still blocked after proxy retry for {}", url));
+                }
+                html = proxy_html;
+                used_proxy = true;
+            } else {
+                return Err("Blocked and no proxy configured".into());
             }
-            html = proxy_html;
-            used_proxy = true;
         } else {
-            return Err("Blocked and no proxy configured".into());
+            // Never mode: don't retry with proxy
+            return Err(format!("Blocked on {} (proxy mode: never)", url));
         }
     }
 
@@ -90,12 +108,18 @@ pub fn crawl_browser(
     limit: u32,
     wait_secs: u64,
     proxy_url: Option<&str>,
+    proxy_mode: &ProxyMode,
 ) -> Result<Vec<CrawlResult>, String> {
     let base_host = Url::parse(start_url)
         .ok()
         .and_then(|u| u.host_str().map(String::from));
 
-    let config = StealthConfig::default();
+    let use_proxy_directly = *proxy_mode == ProxyMode::Always && proxy_url.is_some();
+    let config = if use_proxy_directly {
+        StealthConfig::default().with_proxy(Some(proxy_url.unwrap().to_string()))
+    } else {
+        StealthConfig::default()
+    };
     let browser = stealth::launch_stealth_browser(&config)?;
     let tab = browser.new_tab().map_err(|e| format!("New tab: {}", e))?;
     stealth::apply_stealth(&tab, &config)?;
@@ -120,37 +144,38 @@ pub fn crawl_browser(
             }
         };
 
-        // Check for blocking
-        if proxy::is_blocked(&html, None) {
+        // Check for blocking (skip fallback in always mode since we're already using proxy)
+        if proxy::is_blocked(&html, None) && !use_proxy_directly {
             tracing::warn!("Blocked on {}", url);
-            if let Some(p) = proxy_url {
-                // Try with a fresh proxy browser for this URL
-                match proxy::scrape_with_fallback(&url, wait_secs, Some(p)) {
-                    Ok(proxy_html) => {
-                        let elapsed = start.elapsed().as_millis() as i32;
-                        let meta = metadata::extract_metadata(&proxy_html, &url);
-                        let mut page = Page::default();
-                        page.set_url(url.clone());
-                        page.set_html_bytes(Some(proxy_html.clone().into_bytes()));
-                        if let Ok(parsed) = Url::parse(&url) {
-                            page.set_url_parsed(parsed);
+            if *proxy_mode == ProxyMode::Fallback {
+                if let Some(p) = proxy_url {
+                    match proxy::scrape_with_fallback(&url, wait_secs, Some(p)) {
+                        Ok(proxy_html) => {
+                            let elapsed = start.elapsed().as_millis() as i32;
+                            let meta = metadata::extract_metadata(&proxy_html, &url);
+                            let mut page = Page::default();
+                            page.set_url(url.clone());
+                            page.set_html_bytes(Some(proxy_html.clone().into_bytes()));
+                            if let Ok(parsed) = Url::parse(&url) {
+                                page.set_url_parsed(parsed);
+                            }
+                            let conf = TransformConfig {
+                                return_format: ReturnFormat::Markdown,
+                                ..Default::default()
+                            };
+                            let markdown = transform_content(&page, &conf, &None, &None, &None);
+                            results.push(CrawlResult {
+                                url: url.clone(),
+                                html: proxy_html,
+                                markdown,
+                                metadata: meta,
+                                response_time_ms: elapsed,
+                                used_proxy: true,
+                            });
                         }
-                        let conf = TransformConfig {
-                            return_format: ReturnFormat::Markdown,
-                            ..Default::default()
-                        };
-                        let markdown = transform_content(&page, &conf, &None, &None, &None);
-                        results.push(CrawlResult {
-                            url: url.clone(),
-                            html: proxy_html,
-                            markdown,
-                            metadata: meta,
-                            response_time_ms: elapsed,
-                            used_proxy: true,
-                        });
-                    }
-                    Err(e) => {
-                        tracing::warn!("Proxy fallback also failed for {}: {}", url, e);
+                        Err(e) => {
+                            tracing::warn!("Proxy fallback also failed for {}: {}", url, e);
+                        }
                     }
                 }
             }
