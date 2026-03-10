@@ -4,10 +4,10 @@ use spider_transformations::transformation::content::{
     transform_content, ReturnFormat, TransformConfig,
 };
 use std::collections::{HashSet, VecDeque};
-use std::time::Instant;
+use std::time::{Duration, Instant};
 use url::Url;
 
-use crate::config::ProxyMode;
+use crate::config::{ProxyMode, RetryConfig};
 use crate::metadata::{self, PageMetadata};
 use crate::proxy;
 use crate::stealth::{self, StealthConfig};
@@ -21,59 +21,101 @@ pub struct CrawlResult {
     pub used_proxy: bool,
 }
 
+fn try_direct(url: &str, wait_secs: u64) -> Result<String, String> {
+    let config = StealthConfig::default();
+    let browser = stealth::launch_stealth_browser(&config)?;
+    let tab = browser.new_tab().map_err(|e| format!("New tab: {}", e))?;
+    stealth::apply_stealth(&tab, &config)?;
+    stealth::navigate_stealth(&tab, url, wait_secs, &config)
+}
+
+fn try_proxy(url: &str, wait_secs: u64, proxy_url: &str) -> Result<String, String> {
+    let config = StealthConfig::default().with_proxy(Some(proxy_url.to_string()));
+    let browser = stealth::launch_stealth_browser(&config)?;
+    let tab = browser.new_tab().map_err(|e| format!("New tab (proxy): {}", e))?;
+    stealth::apply_stealth(&tab, &config)?;
+    stealth::navigate_stealth(&tab, url, wait_secs, &config)
+}
+
 pub fn scrape_single(
     url: &str,
     wait_secs: u64,
     proxy_url: Option<&str>,
     proxy_mode: &ProxyMode,
+    retry: &RetryConfig,
 ) -> Result<Vec<CrawlResult>, String> {
     let start = Instant::now();
     let used_proxy;
     let html;
+    let delay = Duration::from_secs(retry.retry_delay_secs);
 
-    let use_proxy_directly = *proxy_mode == ProxyMode::Always && proxy_url.is_some();
-
-    if use_proxy_directly {
-        // Always mode: go straight through proxy
+    if *proxy_mode == ProxyMode::Always && proxy_url.is_some() {
         let p = proxy_url.unwrap();
-        let config = StealthConfig::default().with_proxy(Some(p.to_string()));
-        let browser = stealth::launch_stealth_browser(&config)?;
-        let tab = browser.new_tab().map_err(|e| format!("New tab (proxy): {}", e))?;
-        stealth::apply_stealth(&tab, &config)?;
-        html = stealth::navigate_stealth(&tab, url, wait_secs, &config)?;
+        let mut last_err = String::new();
+        let mut result_html = None;
+        for attempt in 1..=retry.proxy_retries {
+            match try_proxy(url, wait_secs, p) {
+                Ok(h) if !proxy::is_blocked(&h, None) => {
+                    result_html = Some(h);
+                    break;
+                }
+                Ok(_) => last_err = format!("Blocked via proxy on attempt {}", attempt),
+                Err(e) => last_err = format!("Proxy attempt {} failed: {}", attempt, e),
+            }
+            if attempt < retry.proxy_retries {
+                tracing::info!("Proxy retry {}/{} for {} in {}s", attempt, retry.proxy_retries, url, retry.retry_delay_secs);
+                std::thread::sleep(delay);
+            }
+        }
+        html = result_html.ok_or_else(|| format!("All {} proxy attempts failed for {}: {}", retry.proxy_retries, url, last_err))?;
         used_proxy = true;
     } else {
-        // Direct attempt first (fallback or never mode)
-        let config = StealthConfig::default();
-        let browser = stealth::launch_stealth_browser(&config)?;
-        let tab = browser.new_tab().map_err(|e| format!("New tab: {}", e))?;
-        stealth::apply_stealth(&tab, &config)?;
-        let direct_html = stealth::navigate_stealth(&tab, url, wait_secs, &config)?;
+        let mut direct_ok = None;
+        let mut last_err = String::new();
+        for attempt in 1..=retry.direct_retries {
+            match try_direct(url, wait_secs) {
+                Ok(h) if !proxy::is_blocked(&h, None) => {
+                    direct_ok = Some(h);
+                    break;
+                }
+                Ok(_) => last_err = format!("Blocked on direct attempt {}", attempt),
+                Err(e) => last_err = format!("Direct attempt {} failed: {}", attempt, e),
+            }
+            if attempt < retry.direct_retries {
+                tracing::info!("Direct retry {}/{} for {} in {}s", attempt, retry.direct_retries, url, retry.retry_delay_secs);
+                std::thread::sleep(delay);
+            }
+        }
 
-        if !proxy::is_blocked(&direct_html, None) {
-            html = direct_html;
+        if let Some(h) = direct_ok {
+            html = h;
             used_proxy = false;
         } else if *proxy_mode == ProxyMode::Fallback {
-            drop(tab);
-            drop(browser);
-            tracing::warn!("Blocked on direct attempt for {}", url);
+            tracing::warn!("All {} direct attempts failed for {}: {}. Falling back to proxy.", retry.direct_retries, url, last_err);
             if let Some(p) = proxy_url {
-                let config = StealthConfig::default().with_proxy(Some(p.to_string()));
-                let browser = stealth::launch_stealth_browser(&config)?;
-                let tab = browser.new_tab().map_err(|e| format!("New tab (proxy): {}", e))?;
-                stealth::apply_stealth(&tab, &config)?;
-                let proxy_html = stealth::navigate_stealth(&tab, url, wait_secs, &config)?;
-                if proxy::is_blocked(&proxy_html, None) {
-                    return Err(format!("Still blocked after proxy retry for {}", url));
+                let mut proxy_ok = None;
+                let mut proxy_err = String::new();
+                for attempt in 1..=retry.proxy_retries {
+                    match try_proxy(url, wait_secs, p) {
+                        Ok(h) if !proxy::is_blocked(&h, None) => {
+                            proxy_ok = Some(h);
+                            break;
+                        }
+                        Ok(_) => proxy_err = format!("Blocked via proxy on attempt {}", attempt),
+                        Err(e) => proxy_err = format!("Proxy attempt {} failed: {}", attempt, e),
+                    }
+                    if attempt < retry.proxy_retries {
+                        tracing::info!("Proxy retry {}/{} for {} in {}s", attempt, retry.proxy_retries, url, retry.retry_delay_secs);
+                        std::thread::sleep(delay);
+                    }
                 }
-                html = proxy_html;
+                html = proxy_ok.ok_or_else(|| format!("All {} proxy attempts also failed for {}: {}", retry.proxy_retries, url, proxy_err))?;
                 used_proxy = true;
             } else {
                 return Err("Blocked and no proxy configured".into());
             }
         } else {
-            // Never mode: don't retry with proxy
-            return Err(format!("Blocked on {} (proxy mode: never)", url));
+            return Err(format!("Blocked on {} after {} attempts (proxy mode: never)", url, retry.direct_retries));
         }
     }
 
@@ -109,6 +151,7 @@ pub fn crawl_browser(
     wait_secs: u64,
     proxy_url: Option<&str>,
     proxy_mode: &ProxyMode,
+    retry: &RetryConfig,
 ) -> Result<Vec<CrawlResult>, String> {
     let base_host = Url::parse(start_url)
         .ok()
@@ -144,12 +187,11 @@ pub fn crawl_browser(
             }
         };
 
-        // Check for blocking (skip fallback in always mode since we're already using proxy)
         if proxy::is_blocked(&html, None) && !use_proxy_directly {
             tracing::warn!("Blocked on {}", url);
             if *proxy_mode == ProxyMode::Fallback {
                 if let Some(p) = proxy_url {
-                    match proxy::scrape_with_fallback(&url, wait_secs, Some(p)) {
+                    match proxy::scrape_with_fallback(&url, wait_secs, Some(p), retry) {
                         Ok(proxy_html) => {
                             let elapsed = start.elapsed().as_millis() as i32;
                             let meta = metadata::extract_metadata(&proxy_html, &url);
@@ -198,7 +240,6 @@ pub fn crawl_browser(
         };
         let markdown = transform_content(&page, &conf, &None, &None, &None);
 
-        // Extract links for further crawling
         let page_base = Url::parse(&url).ok();
         if let Some(ref base) = page_base {
             let doc = Html::parse_document(&html);
@@ -233,9 +274,8 @@ pub fn crawl_browser(
             break;
         }
 
-        // Random delay
         let delay_ms = 1000 + (rand::random::<u64>() % 2000);
-        std::thread::sleep(std::time::Duration::from_millis(delay_ms));
+        std::thread::sleep(Duration::from_millis(delay_ms));
     }
 
     Ok(results)
