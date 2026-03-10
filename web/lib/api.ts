@@ -6,6 +6,7 @@ export interface Job {
   mode: string;
   page_limit: number | null;
   wait_seconds: number | null;
+  main_content: boolean | null;
   status: string;
   error: string | null;
   pages_crawled: number | null;
@@ -118,7 +119,7 @@ export interface SystemInfoResponse {
 async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(path, {
     ...options,
-    headers: { "Content-Type": "application/json", ...options?.headers },
+    headers: { "Content-Type": "application/json", ...options?.headers }
   });
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
@@ -134,7 +135,7 @@ export function useJobs(limit = 50, offset = 0) {
   return useQuery<JobListResponse>({
     queryKey: ["jobs", limit, offset],
     queryFn: () => apiFetch(`/api/scrape?limit=${limit}&offset=${offset}`),
-    refetchInterval: 2000,
+    refetchInterval: 2000
   });
 }
 
@@ -146,7 +147,7 @@ export function useJob(taskId: string) {
       const status = query.state.data?.status;
       if (status === "completed" || status === "failed") return false;
       return 1000;
-    },
+    }
   });
 }
 
@@ -158,16 +159,17 @@ export function useSubmitJob() {
       mode: string;
       limit: number;
       wait_seconds: number;
+      main_content: boolean;
     }) =>
       apiFetch<{ task_id: string }>("/api/scrape", {
         method: "POST",
-        body: JSON.stringify(data),
+        body: JSON.stringify(data)
       }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["jobs"] });
       qc.invalidateQueries({ queryKey: ["stats"] });
       qc.invalidateQueries({ queryKey: ["queue"] });
-    },
+    }
   });
 }
 
@@ -179,7 +181,7 @@ export function useDeleteJob() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["jobs"] });
       qc.invalidateQueries({ queryKey: ["stats"] });
-    },
+    }
   });
 }
 
@@ -189,7 +191,7 @@ export function useStats() {
   return useQuery<StatsResponse>({
     queryKey: ["stats"],
     queryFn: () => apiFetch("/api/stats"),
-    refetchInterval: 3000,
+    refetchInterval: 3000
   });
 }
 
@@ -197,7 +199,7 @@ export function useQueueStatus() {
   return useQuery<QueueStatusResponse>({
     queryKey: ["queue"],
     queryFn: () => apiFetch("/api/queue/status"),
-    refetchInterval: 2000,
+    refetchInterval: 2000
   });
 }
 
@@ -205,7 +207,7 @@ export function useSystemInfo() {
   return useQuery<SystemInfoResponse>({
     queryKey: ["system"],
     queryFn: () => apiFetch("/api/system"),
-    refetchInterval: 5000,
+    refetchInterval: 5000
   });
 }
 
@@ -213,7 +215,7 @@ export function useHealth() {
   return useQuery<HealthResponse>({
     queryKey: ["health"],
     queryFn: () => apiFetch("/api/health"),
-    refetchInterval: 10000,
+    refetchInterval: 10000
   });
 }
 
