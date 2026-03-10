@@ -1,8 +1,10 @@
+use headless_chrome::protocol::cdp::Fetch;
 use headless_chrome::{Browser, LaunchOptions, Tab};
 use rand::Rng;
 use std::ffi::OsStr;
 use std::sync::Arc;
 use std::time::Duration;
+use url::Url;
 
 const USER_AGENTS: &[&str] = &[
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
@@ -20,8 +22,17 @@ const VIEWPORTS: &[(u32, u32)] = &[
     (1440, 900),
 ];
 
+#[derive(Clone, Debug)]
+pub struct ProxyAuth {
+    pub username: String,
+    pub password: String,
+}
+
 pub struct StealthConfig {
-    pub proxy_url: Option<String>,
+    /// Proxy URL without credentials (protocol://host:port), used for --proxy-server
+    pub proxy_server: Option<String>,
+    /// Proxy credentials, handled separately via CDP Fetch domain
+    pub proxy_auth: Option<ProxyAuth>,
     pub user_agent: Option<String>,
     pub viewport: Option<(u32, u32)>,
 }
@@ -29,7 +40,8 @@ pub struct StealthConfig {
 impl Default for StealthConfig {
     fn default() -> Self {
         Self {
-            proxy_url: None,
+            proxy_server: None,
+            proxy_auth: None,
             user_agent: None,
             viewport: None,
         }
@@ -38,7 +50,26 @@ impl Default for StealthConfig {
 
 impl StealthConfig {
     pub fn with_proxy(mut self, proxy: Option<String>) -> Self {
-        self.proxy_url = proxy;
+        if let Some(ref url_str) = proxy {
+            if let Ok(parsed) = Url::parse(url_str) {
+                let username = parsed.username();
+                let password = parsed.password().unwrap_or("");
+                if !username.is_empty() {
+                    self.proxy_auth = Some(ProxyAuth {
+                        username: username.to_string(),
+                        password: password.to_string(),
+                    });
+                    let mut clean = parsed.clone();
+                    clean.set_username("").ok();
+                    clean.set_password(None).ok();
+                    self.proxy_server = Some(clean.to_string().trim_end_matches('/').to_string());
+                } else {
+                    self.proxy_server = Some(url_str.clone());
+                }
+            } else {
+                self.proxy_server = Some(url_str.clone());
+            }
+        }
         self
     }
 
@@ -92,7 +123,7 @@ pub fn launch_stealth_browser(config: &StealthConfig) -> Result<Browser, String>
         "--use-mock-keychain".into(),
     ];
 
-    if let Some(ref proxy) = config.proxy_url {
+    if let Some(ref proxy) = config.proxy_server {
         args.push(format!("--proxy-server={}", proxy));
     }
 
@@ -274,6 +305,24 @@ pub fn apply_stealth(tab: &Arc<Tab>, config: &StealthConfig) -> Result<(), Strin
 
     tab.set_user_agent(config.resolved_ua(), None, None)
         .map_err(|e| format!("Failed to set user agent: {}", e))?;
+
+    if let Some(ref auth) = config.proxy_auth {
+        tab.enable_fetch(
+            Some(&[Fetch::RequestPattern {
+                url_pattern: Some("*".to_string()),
+                resource_Type: None,
+                request_stage: None,
+            }]),
+            Some(true),
+        )
+        .map_err(|e| format!("Failed to enable fetch for proxy auth: {}", e))?;
+
+        tab.authenticate(
+            Some(auth.username.clone()),
+            Some(auth.password.clone()),
+        )
+        .map_err(|e| format!("Failed to set proxy auth: {}", e))?;
+    }
 
     Ok(())
 }
