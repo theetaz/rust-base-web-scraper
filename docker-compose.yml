@@ -1,0 +1,42 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "${PORT:-9000}:${PORT:-9000}"
+    environment:
+      - PORT=${PORT:-9000}
+      - REDIS_URL=redis://redis:6379
+      - DATABASE_URL=sqlite:///data/spider.db
+      - PROXY_HOST=${PROXY_HOST:-}
+      - PROXY_PORT=${PROXY_PORT:-}
+      - PROXY_USERNAME=${PROXY_USERNAME:-}
+      - PROXY_PASSWORD=${PROXY_PASSWORD:-}
+      - PROXY_PROTOCOL=${PROXY_PROTOCOL:-http}
+      - MAX_WORKERS=${MAX_WORKERS:-3}
+      - RUST_LOG=${RUST_LOG:-info}
+    depends_on:
+      - redis
+    volumes:
+      - spider_data:/data
+
+  web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+      args:
+        - API_URL=http://api:${PORT:-9000}
+    ports:
+      - "3400:3000"
+    depends_on:
+      - api
+
+  redis:
+    image: redis:7-alpine
+    volumes:
+      - redis_data:/data
+
+volumes:
+  spider_data:
+  redis_data:
