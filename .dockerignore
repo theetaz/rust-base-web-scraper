@@ -1,0 +1,13 @@
+target/
+test-output/
+output/
+.git/
+.env
+.env.*
+web/
+*.db
+*.db-wal
+*.db-shm
+.DS_Store
+.vscode/
+.idea/

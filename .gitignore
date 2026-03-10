@@ -1,0 +1,34 @@
+# Rust build artifacts
+/target
+
+# Output directories
+test-output/
+output/
+
+# SQLite databases
+*.db
+*.db-wal
+*.db-shm
+
+# Environment files (may contain secrets)
+.env
+.env.local
+.env.production
+
+# Node.js
+web/node_modules/
+web/.next/
+
+# Docker volumes
+spider_data/
+redis_data/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
