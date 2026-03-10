@@ -43,6 +43,7 @@ pub fn scrape_single(
     proxy_url: Option<&str>,
     proxy_mode: &ProxyMode,
     retry: &RetryConfig,
+    main_content: bool,
 ) -> Result<Vec<CrawlResult>, String> {
     let start = Instant::now();
     let used_proxy;
@@ -131,6 +132,7 @@ pub fn scrape_single(
 
     let conf = TransformConfig {
         return_format: ReturnFormat::Markdown,
+        main_content,
         ..Default::default()
     };
     let markdown = transform_content(&page, &conf, &None, &None, &None);
@@ -152,6 +154,7 @@ pub fn crawl_browser(
     proxy_url: Option<&str>,
     proxy_mode: &ProxyMode,
     retry: &RetryConfig,
+    main_content: bool,
 ) -> Result<Vec<CrawlResult>, String> {
     let base_host = Url::parse(start_url)
         .ok()
@@ -203,6 +206,7 @@ pub fn crawl_browser(
                             }
                             let conf = TransformConfig {
                                 return_format: ReturnFormat::Markdown,
+                                main_content,
                                 ..Default::default()
                             };
                             let markdown = transform_content(&page, &conf, &None, &None, &None);
@@ -236,6 +240,7 @@ pub fn crawl_browser(
 
         let conf = TransformConfig {
             return_format: ReturnFormat::Markdown,
+            main_content,
             ..Default::default()
         };
         let markdown = transform_content(&page, &conf, &None, &None, &None);
@@ -281,7 +286,7 @@ pub fn crawl_browser(
     Ok(results)
 }
 
-pub async fn crawl_http(start_url: &str, limit: u32) -> Vec<CrawlResult> {
+pub async fn crawl_http(start_url: &str, limit: u32, main_content: bool) -> Vec<CrawlResult> {
     use spider::website::Website;
 
     let mut website = Website::new(start_url);
@@ -295,6 +300,7 @@ pub async fn crawl_http(start_url: &str, limit: u32) -> Vec<CrawlResult> {
 
     let conf = TransformConfig {
         return_format: ReturnFormat::Markdown,
+        main_content,
         ..Default::default()
     };
 
