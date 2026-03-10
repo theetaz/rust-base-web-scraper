@@ -50,20 +50,20 @@ async fn worker_loop(pool: Arc<SqlitePool>, config: Arc<Config>, worker_id: usiz
         let wait = job.wait_seconds.unwrap_or(3) as u64;
         let proxy = config.proxy_url.clone();
         let proxy_mode = config.proxy_mode.clone();
+        let retry = config.retry.clone();
 
-        // Execute the crawl in a blocking task
         let result = match mode.as_str() {
             "scrape" => {
                 let proxy_ref = proxy.as_deref().map(String::from);
                 tokio::task::spawn_blocking(move || {
-                    crawler::scrape_single(&url, wait, proxy_ref.as_deref(), &proxy_mode)
+                    crawler::scrape_single(&url, wait, proxy_ref.as_deref(), &proxy_mode, &retry)
                 })
                 .await
             }
             "crawl" => {
                 let proxy_ref = proxy.as_deref().map(String::from);
                 tokio::task::spawn_blocking(move || {
-                    crawler::crawl_browser(&url, limit, wait, proxy_ref.as_deref(), &proxy_mode)
+                    crawler::crawl_browser(&url, limit, wait, proxy_ref.as_deref(), &proxy_mode, &retry)
                 })
                 .await
             }
