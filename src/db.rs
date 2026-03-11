@@ -86,6 +86,7 @@ pub struct JobResult {
     pub response_time_ms: Option<i32>,
     pub used_proxy: Option<bool>,
     pub crawled_at: String,
+    pub assets_json: Option<String>,
 }
 
 pub async fn create_job(
@@ -203,11 +204,12 @@ pub async fn insert_result(
     meta: &crate::metadata::PageMetadata,
     response_time_ms: i32,
     used_proxy: bool,
+    assets_json: Option<&str>,
 ) -> Result<(), CrawlError> {
     let now = chrono::Utc::now().to_rfc3339();
     let headings_json = serde_json::to_string(&meta.headings).unwrap_or_default();
     sqlx::query(
-        "INSERT INTO results (job_id, url, markdown, title, description, language, canonical_url, og_image, favicon, word_count, links_internal, links_external, images_count, headings, response_time_ms, used_proxy, crawled_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+        "INSERT INTO results (job_id, url, markdown, title, description, language, canonical_url, og_image, favicon, word_count, links_internal, links_external, images_count, headings, response_time_ms, used_proxy, crawled_at, assets_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
     )
     .bind(job_id)
     .bind(url)
@@ -226,6 +228,7 @@ pub async fn insert_result(
     .bind(response_time_ms)
     .bind(used_proxy)
     .bind(&now)
+    .bind(assets_json)
     .execute(pool)
     .await?;
     Ok(())
