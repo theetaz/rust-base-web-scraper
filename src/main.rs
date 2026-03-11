@@ -4,6 +4,7 @@ mod crawler;
 mod db;
 mod error;
 mod metadata;
+mod pdf;
 mod proxy;
 mod queue;
 mod stealth;
@@ -141,7 +142,12 @@ async fn run_cli(url: String, limit: u32, output: String, browser: bool, scrape:
     let proxy_mode = cfg.proxy_mode.clone();
     let retry = cfg.retry.clone();
 
-    let results = if scrape {
+    let is_pdf = pdf::is_pdf_url(&url) || pdf::is_pdf_content_type(&url).await;
+
+    let results = if is_pdf {
+        println!("Detected PDF, using pdf_oxide parser");
+        pdf::scrape_pdf(&url).await.expect("PDF parse failed")
+    } else if scrape {
         let proxy_ref = proxy.as_deref().map(String::from);
         tokio::task::spawn_blocking(move || {
             crawler::scrape_single(&url, wait, proxy_ref.as_deref(), &proxy_mode, &retry, main_content)
