@@ -116,6 +116,11 @@ export interface SystemInfoResponse {
   recent_errors: Job[];
 }
 
+export interface CleanupResponse {
+  removed_count: number;
+  freed_bytes: number;
+}
+
 async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(path, {
     ...options,
@@ -216,6 +221,20 @@ export function useHealth() {
     queryKey: ["health"],
     queryFn: () => apiFetch("/api/health"),
     refetchInterval: 10000
+  });
+}
+
+export function useCleanupStorage() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (params: { mode: "orphaned" | "all" }) =>
+      apiFetch<CleanupResponse>(
+        `/api/cleanup?mode=${params.mode}`,
+        { method: "POST" }
+      ),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["system"] });
+    },
   });
 }
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useSystemInfo, useHealth } from "@/lib/api";
+import { useSystemInfo, useHealth, useCleanupStorage } from "@/lib/api";
 import { StatusBadge } from "@/components/status-badge";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,7 +11,17 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
-import { Copy, Send, Loader2 } from "lucide-react";
+import { Copy, Send, Loader2, Trash2 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export default function SystemPage() {
   const { data: system, isLoading } = useSystemInfo();
@@ -78,6 +88,9 @@ export default function SystemPage() {
           </CardContent>
         </Card>
       )}
+
+      {/* Storage Cleanup */}
+      <StorageCleanupCard />
 
       {/* API Tester */}
       <ApiTester />
@@ -173,6 +186,68 @@ function ConfigItem({
   );
 }
 
+function StorageCleanupCard() {
+  const cleanup = useCleanupStorage();
+  const [confirmAllOpen, setConfirmAllOpen] = useState(false);
+
+  const runCleanup = async (mode: "orphaned" | "all") => {
+    try {
+      const res = await cleanup.mutateAsync({ mode });
+      const mb = (res.freed_bytes / (1024 * 1024)).toFixed(2);
+      toast.success(`Removed ${res.removed_count} dirs, freed ${mb} MB`);
+      setConfirmAllOpen(false);
+    } catch (err) {
+      toast.error(String(err));
+    }
+  };
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="text-sm">Storage Cleanup</CardTitle>
+      </CardHeader>
+      <CardContent className="flex gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => runCleanup("orphaned")}
+          disabled={cleanup.isPending}
+        >
+          {cleanup.isPending ? <Loader2 className="size-3.5 animate-spin" /> : <Trash2 className="size-3.5" />}
+          Clean Orphaned
+        </Button>
+        <Button
+          variant="destructive"
+          size="sm"
+          onClick={() => setConfirmAllOpen(true)}
+          disabled={cleanup.isPending}
+        >
+          Clean All
+        </Button>
+        <AlertDialog open={confirmAllOpen} onOpenChange={setConfirmAllOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Clean all PDF images?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This will remove all PDF image directories. This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                onClick={() => runCleanup("all")}
+              >
+                Clean All
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </CardContent>
+    </Card>
+  );
+}
+
 function ApiTester() {
   const [selectedEndpoint, setSelectedEndpoint] = useState("/api/health");
   const [method, setMethod] = useState("GET");
@@ -187,6 +262,7 @@ function ApiTester() {
     { path: "/api/stats", method: "GET", label: "Stats" },
     { path: "/api/queue/status", method: "GET", label: "Queue Status" },
     { path: "/api/system", method: "GET", label: "System Info" },
+    { path: "/api/cleanup?mode=orphaned", method: "POST", label: "Cleanup Storage" },
     { path: "/api/scrape", method: "GET", label: "List Jobs" },
     {
       path: "/api/scrape",
