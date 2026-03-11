@@ -38,3 +38,5 @@ CREATE INDEX IF NOT EXISTS idx_jobs_created ON jobs(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_results_job ON results(job_id);
 
 ALTER TABLE jobs ADD COLUMN main_content BOOLEAN DEFAULT FALSE;
+
+ALTER TABLE results ADD COLUMN assets_json TEXT;
