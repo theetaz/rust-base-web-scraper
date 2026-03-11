@@ -165,6 +165,31 @@ pub async fn get_system_info(
     }))
 }
 
+pub async fn cleanup_storage(
+    State(state): State<AppState>,
+    Query(params): Query<CleanupQuery>,
+) -> Result<Json<CleanupResponse>, CrawlError> {
+    let mode = params.mode.to_lowercase();
+    if mode != "orphaned" && mode != "all" {
+        return Err(CrawlError::BadRequest(
+            "mode must be 'orphaned' or 'all'".into(),
+        ));
+    }
+
+    let result = if mode == "all" {
+        pdf::cleanup_all_images().map_err(|e| CrawlError::Internal(e))?
+    } else {
+        pdf::cleanup_orphaned_images(state.db.as_ref())
+            .await
+            .map_err(|e| CrawlError::Internal(e))?
+    };
+
+    Ok(Json(CleanupResponse {
+        removed_count: result.removed_count,
+        freed_bytes: result.freed_bytes,
+    }))
+}
+
 pub async fn health_check(
     State(state): State<AppState>,
 ) -> Json<HealthResponse> {

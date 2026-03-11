@@ -34,6 +34,7 @@ pub fn create_router(state: AppState) -> Router {
         .route("/api/stats", get(handlers::get_stats))
         .route("/api/queue/status", get(handlers::get_queue_status))
         .route("/api/system", get(handlers::get_system_info))
+        .route("/api/cleanup", post(handlers::cleanup_storage))
         .route("/api/health", get(handlers::health_check))
         .layer(cors)
         .layer(TraceLayer::new_for_http())

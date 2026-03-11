@@ -87,6 +87,22 @@ pub struct ListQuery {
     pub offset: Option<i32>,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct CleanupQuery {
+    #[serde(default = "default_cleanup_mode")]
+    pub mode: String,
+}
+
+fn default_cleanup_mode() -> String {
+    "orphaned".into()
+}
+
+#[derive(Debug, Serialize)]
+pub struct CleanupResponse {
+    pub removed_count: u32,
+    pub freed_bytes: u64,
+}
+
 #[derive(Debug, Serialize)]
 pub struct HealthResponse {
     pub status: String,

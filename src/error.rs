@@ -20,6 +20,9 @@ pub enum CrawlError {
 
     #[error("Invalid request: {0}")]
     BadRequest(String),
+
+    #[error("Internal error: {0}")]
+    Internal(String),
 }
 
 impl IntoResponse for CrawlError {

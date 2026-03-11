@@ -107,6 +107,93 @@ pub fn cleanup_images(task_id: &str) {
     }
 }
 
+#[derive(Debug, serde::Serialize)]
+pub struct CleanupResult {
+    pub removed_count: u32,
+    pub freed_bytes: u64,
+}
+
+fn dir_size(path: &Path) -> u64 {
+    fs::read_dir(path)
+        .map(|entries| {
+            entries
+                .filter_map(|e| e.ok())
+                .map(|e| {
+                    let p = e.path();
+                    if p.is_dir() {
+                        dir_size(&p)
+                    } else {
+                        p.metadata().map(|m| m.len()).unwrap_or(0)
+                    }
+                })
+                .sum::<u64>()
+        })
+        .unwrap_or(0)
+}
+
+pub async fn cleanup_orphaned_images(
+    pool: &sqlx::SqlitePool,
+) -> Result<CleanupResult, String> {
+    let base = PathBuf::from(PDF_IMAGES_DIR);
+    if !base.exists() {
+        return Ok(CleanupResult { removed_count: 0, freed_bytes: 0 });
+    }
+
+    let entries = fs::read_dir(&base).map_err(|e| format!("Read dir: {}", e))?;
+    let mut removed = 0u32;
+    let mut freed = 0u64;
+
+    for e in entries.filter_map(|e| e.ok()) {
+        let path = e.path();
+        if !path.is_dir() {
+            continue;
+        }
+        let task_id = path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("");
+        if task_id.is_empty() {
+            continue;
+        }
+
+        let exists: Option<i32> = sqlx::query_scalar("SELECT 1 FROM jobs WHERE id = ?")
+            .bind(task_id)
+            .fetch_optional(pool)
+            .await
+            .map_err(|e| format!("DB query: {}", e))?;
+
+        if exists.is_none() {
+            let size = dir_size(&path);
+            if fs::remove_dir_all(&path).is_ok() {
+                removed += 1;
+                freed += size;
+            }
+        }
+    }
+
+    Ok(CleanupResult { removed_count: removed, freed_bytes: freed })
+}
+
+pub fn cleanup_all_images() -> Result<CleanupResult, String> {
+    let base = PathBuf::from(PDF_IMAGES_DIR);
+    if !base.exists() {
+        return Ok(CleanupResult { removed_count: 0, freed_bytes: 0 });
+    }
+
+    let total_size = dir_size(&base);
+    let count = fs::read_dir(&base)
+        .map(|e| e.filter_map(|x| x.ok()).count())
+        .unwrap_or(0);
+
+    fs::remove_dir_all(&base).map_err(|e| format!("Remove dir: {}", e))?;
+    fs::create_dir_all(&base).map_err(|e| format!("Create dir: {}", e))?;
+
+    Ok(CleanupResult {
+        removed_count: count as u32,
+        freed_bytes: total_size,
+    })
+}
+
 async fn download_pdf(url: &str) -> Result<Vec<u8>, String> {
     let client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(120))
