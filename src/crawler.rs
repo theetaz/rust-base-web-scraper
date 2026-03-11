@@ -12,6 +12,13 @@ use crate::metadata::{self, PageMetadata};
 use crate::proxy;
 use crate::stealth::{self, StealthConfig};
 
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct Asset {
+    pub filename: String,
+    pub url: String,
+    pub content_type: String,
+}
+
 pub struct CrawlResult {
     pub url: String,
     pub html: String,
@@ -19,6 +26,7 @@ pub struct CrawlResult {
     pub metadata: PageMetadata,
     pub response_time_ms: i32,
     pub used_proxy: bool,
+    pub assets: Vec<Asset>,
 }
 
 fn try_direct(url: &str, wait_secs: u64) -> Result<String, String> {
@@ -144,6 +152,7 @@ pub fn scrape_single(
         metadata: meta,
         response_time_ms: elapsed,
         used_proxy,
+        assets: vec![],
     }])
 }
 
@@ -217,6 +226,7 @@ pub fn crawl_browser(
                                 metadata: meta,
                                 response_time_ms: elapsed,
                                 used_proxy: true,
+                                assets: vec![],
                             });
                         }
                         Err(e) => {
@@ -273,6 +283,7 @@ pub fn crawl_browser(
             metadata: meta,
             response_time_ms: elapsed,
             used_proxy: false,
+            assets: vec![],
         });
 
         if results.len() >= limit as usize {
@@ -320,6 +331,7 @@ pub async fn crawl_http(start_url: &str, limit: u32, main_content: bool) -> Vec<
                 metadata: meta,
                 response_time_ms: 0,
                 used_proxy: false,
+                assets: vec![],
             }
         })
         .collect()
