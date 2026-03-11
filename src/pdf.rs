@@ -1,10 +1,11 @@
+use regex::Regex;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 use std::{fs, io::Write};
 use tempfile::NamedTempFile;
 use url::Url;
 
-use crate::crawler::CrawlResult;
+use crate::crawler::{Asset, CrawlResult};
 use crate::metadata::PageMetadata;
 
 const PDF_IMAGES_DIR: &str = "data/pdf_images";
@@ -32,14 +33,15 @@ pub async fn is_pdf_content_type(url: &str) -> bool {
     }
 }
 
-/// Download PDF, extract clean LLM-optimized markdown with images as files.
-/// `task_id` determines the image output directory; images are referenced as API URLs.
+/// API path: images saved under data/pdf_images/{task_id}/, assets get API URLs.
 pub async fn scrape_pdf(url: &str, task_id: &str) -> Result<Vec<CrawlResult>, String> {
     let start = Instant::now();
     let bytes = download_pdf(url).await?;
 
     let image_dir = PathBuf::from(PDF_IMAGES_DIR).join(task_id);
-    let (markdown, images_count) = parse_pdf_to_markdown(&bytes, &image_dir, task_id)?;
+    let api_prefix = format!("/api/pdf-images/{}", task_id);
+    let ParseResult { markdown, assets, images_count } =
+        parse_pdf_to_markdown(&bytes, &image_dir, &api_prefix)?;
 
     let word_count = markdown.split_whitespace().count() as i32;
     let elapsed = start.elapsed().as_millis() as i32;
@@ -49,30 +51,30 @@ pub async fn scrape_pdf(url: &str, task_id: &str) -> Result<Vec<CrawlResult>, St
         .find(|l| l.starts_with("# "))
         .map(|l| l.trim_start_matches("# ").to_string());
 
-    let metadata = PageMetadata {
-        title,
-        word_count,
-        images_count,
-        ..Default::default()
-    };
-
     Ok(vec![CrawlResult {
         url: url.to_string(),
         html: String::new(),
         markdown,
-        metadata,
+        metadata: PageMetadata {
+            title,
+            word_count,
+            images_count,
+            ..Default::default()
+        },
         response_time_ms: elapsed,
         used_proxy: false,
+        assets,
     }])
 }
 
-/// CLI variant: images saved alongside markdown in the output directory.
+/// CLI path: images saved in {output_dir}/images/, assets get local file paths.
 pub async fn scrape_pdf_cli(url: &str, output_dir: &str) -> Result<Vec<CrawlResult>, String> {
     let start = Instant::now();
     let bytes = download_pdf(url).await?;
 
     let image_dir = PathBuf::from(output_dir).join("images");
-    let (markdown, images_count) = parse_pdf_to_markdown(&bytes, &image_dir, "")?;
+    let ParseResult { markdown, assets, images_count } =
+        parse_pdf_to_markdown(&bytes, &image_dir, "images")?;
 
     let word_count = markdown.split_whitespace().count() as i32;
     let elapsed = start.elapsed().as_millis() as i32;
@@ -82,24 +84,22 @@ pub async fn scrape_pdf_cli(url: &str, output_dir: &str) -> Result<Vec<CrawlResu
         .find(|l| l.starts_with("# "))
         .map(|l| l.trim_start_matches("# ").to_string());
 
-    let metadata = PageMetadata {
-        title,
-        word_count,
-        images_count,
-        ..Default::default()
-    };
-
     Ok(vec![CrawlResult {
         url: url.to_string(),
         html: String::new(),
         markdown,
-        metadata,
+        metadata: PageMetadata {
+            title,
+            word_count,
+            images_count,
+            ..Default::default()
+        },
         response_time_ms: elapsed,
         used_proxy: false,
+        assets,
     }])
 }
 
-/// Remove extracted images for a given task.
 pub fn cleanup_images(task_id: &str) {
     let dir = PathBuf::from(PDF_IMAGES_DIR).join(task_id);
     if dir.exists() {
@@ -129,11 +129,27 @@ async fn download_pdf(url: &str) -> Result<Vec<u8>, String> {
         .map_err(|e| format!("Failed to read PDF bytes: {}", e))
 }
 
+struct ParseResult {
+    markdown: String,
+    assets: Vec<Asset>,
+    images_count: i32,
+}
+
+fn content_type_for(ext: &str) -> &'static str {
+    match ext {
+        "png" => "image/png",
+        "jpg" | "jpeg" => "image/jpeg",
+        "gif" => "image/gif",
+        "webp" => "image/webp",
+        _ => "application/octet-stream",
+    }
+}
+
 fn parse_pdf_to_markdown(
     bytes: &[u8],
     image_dir: &Path,
-    task_id: &str,
-) -> Result<(String, i32), String> {
+    url_prefix: &str,
+) -> Result<ParseResult, String> {
     let mut tmp = NamedTempFile::new().map_err(|e| format!("Temp file error: {}", e))?;
     tmp.write_all(bytes)
         .map_err(|e| format!("Write temp file: {}", e))?;
@@ -167,43 +183,69 @@ fn parse_pdf_to_markdown(
     }
 
     if parts.is_empty() {
+        fs::remove_dir_all(image_dir).ok();
         return Err("No extractable text in PDF".into());
     }
 
-    let mut markdown = parts.join("\n\n---\n\n");
+    let raw_markdown = parts.join("\n\n---\n\n");
 
-    // Count extracted images
-    let images_count = fs::read_dir(image_dir)
+    // Collect extracted image files as assets
+    let image_files: Vec<String> = fs::read_dir(image_dir)
         .map(|entries| {
-            entries
+            let mut files: Vec<String> = entries
                 .filter_map(|e| e.ok())
-                .filter(|e| {
-                    e.path()
-                        .extension()
-                        .map(|ext| matches!(ext.to_str(), Some("png" | "jpg" | "jpeg" | "gif" | "webp")))
-                        .unwrap_or(false)
+                .filter_map(|e| {
+                    let p = e.path();
+                    let ext = p.extension()?.to_str()?;
+                    if matches!(ext, "png" | "jpg" | "jpeg" | "gif" | "webp") {
+                        Some(e.file_name().to_string_lossy().to_string())
+                    } else {
+                        None
+                    }
                 })
-                .count() as i32
+                .collect();
+            files.sort();
+            files
         })
-        .unwrap_or(0);
+        .unwrap_or_default();
 
-    // Rewrite image paths: local filesystem paths → API URLs
-    if !task_id.is_empty() && images_count > 0 {
-        let dir_str = image_dir.to_string_lossy();
-        markdown = markdown.replace(
-            &format!("]({}/" , dir_str),
-            &format!("](/api/pdf-images/{}/", task_id),
-        );
-        markdown = markdown.replace(
-            &format!("]({}\\", dir_str),
-            &format!("](/api/pdf-images/{}/", task_id),
-        );
-    }
+    let assets: Vec<Asset> = image_files
+        .iter()
+        .map(|name| {
+            let ext = Path::new(name)
+                .extension()
+                .and_then(|e| e.to_str())
+                .unwrap_or("png");
+            Asset {
+                filename: name.clone(),
+                url: format!("{}/{}", url_prefix, name),
+                content_type: content_type_for(ext).to_string(),
+            }
+        })
+        .collect();
+
+    let images_count = assets.len() as i32;
+
+    // Replace ![alt](path) with <image: filename - alt> for LLM-clean markdown
+    let img_re = Regex::new(r"!\[([^\]]*)\]\([^\)]*?([^/\\\)]+)\)").unwrap();
+    let markdown = img_re.replace_all(&raw_markdown, |caps: &regex::Captures| {
+        let alt = caps.get(1).map_or("", |m| m.as_str()).trim();
+        let filename = caps.get(2).map_or("image", |m| m.as_str());
+        if alt.is_empty() {
+            format!("<image: {}>", filename)
+        } else {
+            format!("<image: {} - {}>", filename, alt)
+        }
+    });
 
     // Clean up empty image dir
     if images_count == 0 {
         fs::remove_dir_all(image_dir).ok();
     }
 
-    Ok((markdown, images_count))
+    Ok(ParseResult {
+        markdown: markdown.into_owned(),
+        assets,
+        images_count,
+    })
 }
