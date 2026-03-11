@@ -32,3 +32,10 @@ Thumbs.db
 .idea/
 *.swp
 *.swo
+
+# Agentic code IDE
+.agents
+.cursor
+.cursorrules
+.claude
+skills-lock.json
