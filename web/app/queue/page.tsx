@@ -19,7 +19,9 @@ export default function QueuePage() {
       <div className="space-y-6">
         <div>
           <h1 className="text-2xl font-bold">Queue Monitor</h1>
-          <p className="text-sm text-muted-foreground mt-1">Live view of job pipeline and worker activity</p>
+          <p className="text-sm text-muted-foreground mt-1">
+            Live view of job pipeline and worker activity
+          </p>
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           {Array.from({ length: 4 }).map((_, i) => (
@@ -34,7 +36,8 @@ export default function QueuePage() {
 
   const runningJobs = queue?.running_jobs ?? 0;
   const maxWorkers = queue?.max_workers ?? 3;
-  const workerUtilization = maxWorkers > 0 ? Math.round((runningJobs / maxWorkers) * 100) : 0;
+  const workerUtilization =
+    maxWorkers > 0 ? Math.round((runningJobs / maxWorkers) * 100) : 0;
 
   return (
     <div className="space-y-6">
@@ -45,7 +48,6 @@ export default function QueuePage() {
         </p>
       </div>
 
-      {/* Pipeline overview */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <PipelineCard
           label="Queue Depth"
@@ -77,12 +79,13 @@ export default function QueuePage() {
         />
       </div>
 
-      {/* Worker slots visualization */}
       <Card>
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
             <CardTitle className="text-sm">Worker Slots</CardTitle>
-            <Badge variant="secondary" className="text-xs">{workerUtilization}% utilized</Badge>
+            <Badge variant="secondary" className="text-xs">
+              {workerUtilization}% utilized
+            </Badge>
           </div>
         </CardHeader>
         <CardContent>
@@ -93,11 +96,10 @@ export default function QueuePage() {
               return (
                 <div
                   key={i}
-                  className={`flex-1 h-10 rounded-md border flex items-center justify-center text-xs font-medium transition-all ${
-                    isActive
+                  className={`flex-1 h-10 rounded-md border flex items-center justify-center text-xs font-medium transition-all ${isActive
                       ? "bg-primary/10 border-primary/50 text-primary animate-pulse"
                       : "bg-muted/30 border-border text-muted-foreground"
-                  }`}
+                    }`}
                 >
                   Worker {i + 1}
                   {isActive && (
@@ -110,7 +112,6 @@ export default function QueuePage() {
         </CardContent>
       </Card>
 
-      {/* Pipeline flow */}
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-sm">Pipeline Flow</CardTitle>
@@ -146,19 +147,26 @@ export default function QueuePage() {
         </CardContent>
       </Card>
 
-      {/* Throughput stats */}
       {stats && (
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <Card>
             <CardContent className="p-4">
-              <p className="text-xs text-muted-foreground">Total Pages Crawled</p>
-              <p className="text-2xl font-bold">{stats.jobs.total_pages_crawled}</p>
+              <p className="text-xs text-muted-foreground">
+                Total Pages Crawled
+              </p>
+              <p className="text-2xl font-bold">
+                {stats.jobs.total_pages_crawled}
+              </p>
             </CardContent>
           </Card>
           <Card>
             <CardContent className="p-4">
-              <p className="text-xs text-muted-foreground">Avg Response Time</p>
-              <p className="text-2xl font-bold">{stats.jobs.avg_response_time_ms.toFixed(0)}ms</p>
+              <p className="text-xs text-muted-foreground">
+                Avg Response Time
+              </p>
+              <p className="text-2xl font-bold">
+                {stats.jobs.avg_response_time_ms.toFixed(0)}ms
+              </p>
             </CardContent>
           </Card>
           <Card>
@@ -166,15 +174,19 @@ export default function QueuePage() {
               <p className="text-xs text-muted-foreground">Success Rate</p>
               <p className="text-2xl font-bold">
                 {stats.jobs.completed + stats.jobs.failed > 0
-                  ? Math.round((stats.jobs.completed / (stats.jobs.completed + stats.jobs.failed)) * 100)
-                  : 0}%
+                  ? Math.round(
+                    (stats.jobs.completed /
+                      (stats.jobs.completed + stats.jobs.failed)) *
+                    100
+                  )
+                  : 0}
+                %
               </p>
             </CardContent>
           </Card>
         </div>
       )}
 
-      {/* Recent activity feed */}
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-sm">Recent Activity</CardTitle>
@@ -201,13 +213,21 @@ export default function QueuePage() {
                       {activity.url}
                     </Link>
                   </div>
-                  <Badge variant="outline" className="text-xs">{activity.mode}</Badge>
-                  {activity.pages_crawled != null && activity.pages_crawled > 0 && (
-                    <span className="text-xs text-muted-foreground">{activity.pages_crawled}p</span>
-                  )}
+                  <Badge variant="outline" className="text-xs">
+                    {activity.mode}
+                  </Badge>
+                  {activity.pages_crawled != null &&
+                    activity.pages_crawled > 0 && (
+                      <span className="text-xs text-muted-foreground">
+                        {activity.pages_crawled}p
+                      </span>
+                    )}
                   <TimeAgo date={activity.created_at} />
                   {activity.error && (
-                    <span className="text-xs text-destructive truncate max-w-32" title={activity.error}>
+                    <span
+                      className="text-xs text-destructive truncate max-w-32"
+                      title={activity.error}
+                    >
                       {activity.error}
                     </span>
                   )}
@@ -238,7 +258,9 @@ function PipelineCard({
     <Card>
       <CardContent className="p-4">
         <p className="text-xs text-muted-foreground">{label}</p>
-        <p className={`text-3xl font-bold ${color} ${pulse ? "animate-pulse" : ""}`}>
+        <p
+          className={`text-3xl font-bold ${color} ${pulse ? "animate-pulse" : ""}`}
+        >
           {value}
         </p>
         <p className="text-[11px] text-muted-foreground mt-0.5">{sub}</p>
@@ -259,15 +281,21 @@ function PipelineStage({
   active?: boolean;
 }) {
   return (
-    <div className={`flex flex-col items-center gap-1 px-4 py-3 rounded-lg bg-muted/30 ${active ? "animate-pulse" : ""}`}>
+    <div
+      className={`flex flex-col items-center gap-1 px-4 py-3 rounded-lg bg-muted/30 ${active ? "animate-pulse" : ""}`}
+    >
       <span className="text-2xl font-bold">{count}</span>
-      <Badge variant={variant} className="text-xs">{label}</Badge>
+      <Badge variant={variant} className="text-xs">
+        {label}
+      </Badge>
     </div>
   );
 }
 
 function TimeAgo({ date }: { date: string }) {
-  const seconds = Math.floor((Date.now() - new Date(date).getTime()) / 1000);
+  const seconds = Math.floor(
+    (Date.now() - new Date(date).getTime()) / 1000
+  );
   let text: string;
   if (seconds < 60) text = `${seconds}s ago`;
   else if (seconds < 3600) text = `${Math.floor(seconds / 60)}m ago`;
@@ -275,6 +303,8 @@ function TimeAgo({ date }: { date: string }) {
   else text = `${Math.floor(seconds / 86400)}d ago`;
 
   return (
-    <span className="text-[11px] text-muted-foreground whitespace-nowrap">{text}</span>
+    <span className="text-[11px] text-muted-foreground whitespace-nowrap">
+      {text}
+    </span>
   );
 }

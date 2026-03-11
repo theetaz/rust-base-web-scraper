@@ -56,14 +56,12 @@ export default function SystemPage() {
         </p>
       </div>
 
-      {/* Health status */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <HealthCard label="Overall" status={health?.status ?? "unknown"} />
         <HealthCard label="Redis" status={health?.redis ?? "unknown"} />
         <HealthCard label="SQLite" status={health?.sqlite ?? "unknown"} />
       </div>
 
-      {/* Configuration */}
       {system?.config && (
         <Card>
           <CardHeader className="pb-3">
@@ -72,7 +70,10 @@ export default function SystemPage() {
           <CardContent>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <ConfigItem label="Port" value={String(system.config.port)} />
-              <ConfigItem label="Max Workers" value={String(system.config.max_workers)} />
+              <ConfigItem
+                label="Max Workers"
+                value={String(system.config.max_workers)}
+              />
               <ConfigItem
                 label="Proxy"
                 value={
@@ -82,20 +83,20 @@ export default function SystemPage() {
                 }
                 warn={!system.config.proxy_configured}
               />
-              <ConfigItem label="Database" value={system.config.database_url} mono />
+              <ConfigItem
+                label="Database"
+                value={system.config.database_url}
+                mono
+              />
               <ConfigItem label="Redis" value={system.config.redis_url} mono />
             </div>
           </CardContent>
         </Card>
       )}
 
-      {/* Storage Cleanup */}
       <StorageCleanupCard />
-
-      {/* API Tester */}
       <ApiTester />
 
-      {/* Recent errors */}
       <Card>
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
@@ -124,7 +125,9 @@ export default function SystemPage() {
                       {job.url}
                     </Link>
                     <span className="text-[11px] text-muted-foreground ml-auto whitespace-nowrap">
-                      {job.completed_at ? new Date(job.completed_at).toLocaleString() : ""}
+                      {job.completed_at
+                        ? new Date(job.completed_at).toLocaleString()
+                        : ""}
                     </span>
                   </div>
                   {job.error && (
@@ -152,7 +155,9 @@ function HealthCard({ label, status }: { label: string; status: string }) {
         />
         <div>
           <p className="text-xs text-muted-foreground">{label}</p>
-          <p className={`text-sm font-medium ${isOk ? "text-success" : "text-destructive"}`}>
+          <p
+            className={`text-sm font-medium ${isOk ? "text-success" : "text-destructive"}`}
+          >
             {status}
           </p>
         </div>
@@ -178,7 +183,9 @@ function ConfigItem({
         <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
           {label}
         </p>
-        <p className={`text-sm mt-0.5 ${mono ? "font-mono" : ""} ${warn ? "text-warning" : ""}`}>
+        <p
+          className={`text-sm mt-0.5 ${mono ? "font-mono" : ""} ${warn ? "text-warning" : ""}`}
+        >
           {value}
         </p>
       </CardContent>
@@ -213,7 +220,11 @@ function StorageCleanupCard() {
           onClick={() => runCleanup("orphaned")}
           disabled={cleanup.isPending}
         >
-          {cleanup.isPending ? <Loader2 className="size-3.5 animate-spin" /> : <Trash2 className="size-3.5" />}
+          {cleanup.isPending ? (
+            <Loader2 className="size-3.5 animate-spin" />
+          ) : (
+            <Trash2 className="size-3.5" />
+          )}
           Clean Orphaned
         </Button>
         <Button
@@ -229,7 +240,8 @@ function StorageCleanupCard() {
             <AlertDialogHeader>
               <AlertDialogTitle>Clean all PDF images?</AlertDialogTitle>
               <AlertDialogDescription>
-                This will remove all PDF image directories. This action cannot be undone.
+                This will remove all PDF image directories. This action cannot
+                be undone.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
@@ -262,14 +274,23 @@ function ApiTester() {
     { path: "/api/stats", method: "GET", label: "Stats" },
     { path: "/api/queue/status", method: "GET", label: "Queue Status" },
     { path: "/api/system", method: "GET", label: "System Info" },
-    { path: "/api/cleanup?mode=orphaned", method: "POST", label: "Cleanup Storage" },
+    {
+      path: "/api/cleanup?mode=orphaned",
+      method: "POST",
+      label: "Cleanup Storage",
+    },
     { path: "/api/scrape", method: "GET", label: "List Jobs" },
     {
       path: "/api/scrape",
       method: "POST",
       label: "Submit Job",
       defaultBody: JSON.stringify(
-        { url: "https://example.com", mode: "scrape", limit: 1, wait_seconds: 3 },
+        {
+          url: "https://example.com",
+          mode: "scrape",
+          limit: 1,
+          wait_seconds: 3,
+        },
         null,
         2
       ),

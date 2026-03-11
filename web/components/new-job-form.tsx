@@ -128,7 +128,11 @@ export function NewJobForm() {
             </p>
           )}
 
-          <Button type="submit" disabled={submitJob.isPending} className="w-full">
+          <Button
+            type="submit"
+            disabled={submitJob.isPending}
+            className="w-full"
+          >
             {submitJob.isPending ? (
               <>
                 <Loader2 className="size-4 animate-spin" />

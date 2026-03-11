@@ -1,7 +1,13 @@
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
-const statusConfig: Record<string, { variant: "default" | "secondary" | "destructive" | "outline" | "success" | "warning"; className?: string }> = {
+const statusConfig: Record<
+  string,
+  {
+    variant: "default" | "secondary" | "destructive" | "outline" | "success" | "warning";
+    className?: string;
+  }
+> = {
   queued: { variant: "secondary" },
   running: { variant: "default", className: "animate-pulse" },
   completed: { variant: "success" },

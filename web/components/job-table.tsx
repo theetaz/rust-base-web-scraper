@@ -66,7 +66,8 @@ export function JobTable({ jobs }: { jobs: Job[] }) {
       if (sortKey === "created_at") cmp = a.created_at.localeCompare(b.created_at);
       else if (sortKey === "status") cmp = a.status.localeCompare(b.status);
       else if (sortKey === "mode") cmp = a.mode.localeCompare(b.mode);
-      else if (sortKey === "pages_crawled") cmp = (a.pages_crawled ?? 0) - (b.pages_crawled ?? 0);
+      else if (sortKey === "pages_crawled")
+        cmp = (a.pages_crawled ?? 0) - (b.pages_crawled ?? 0);
       return sortDesc ? -cmp : cmp;
     });
 
@@ -161,7 +162,11 @@ export function JobTable({ jobs }: { jobs: Job[] }) {
             {filtered.map((job) => {
               const duration =
                 job.started_at && job.completed_at
-                  ? ((new Date(job.completed_at).getTime() - new Date(job.started_at).getTime()) / 1000).toFixed(1) + "s"
+                  ? (
+                    (new Date(job.completed_at).getTime() -
+                      new Date(job.started_at).getTime()) /
+                    1000
+                  ).toFixed(1) + "s"
                   : job.started_at
                     ? "..."
                     : "-";
@@ -176,14 +181,18 @@ export function JobTable({ jobs }: { jobs: Job[] }) {
                       className="text-primary hover:underline truncate block max-w-xs"
                       title={job.url}
                     >
-                      {job.url.length > 55 ? job.url.substring(0, 55) + "..." : job.url}
+                      {job.url.length > 55
+                        ? job.url.substring(0, 55) + "..."
+                        : job.url}
                     </Link>
                     <span className="text-[10px] font-mono text-muted-foreground">
                       {job.id.slice(0, 8)}
                     </span>
                   </TableCell>
                   <TableCell className="text-muted-foreground">{job.mode}</TableCell>
-                  <TableCell className="text-muted-foreground">{job.pages_crawled ?? 0}</TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {job.pages_crawled ?? 0}
+                  </TableCell>
                   <TableCell className="text-muted-foreground text-xs">
                     {new Date(job.created_at).toLocaleString()}
                   </TableCell>
@@ -199,7 +208,11 @@ export function JobTable({ jobs }: { jobs: Job[] }) {
                       </Button>
                       <AlertDialog>
                         <AlertDialogTrigger asChild>
-                          <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-destructive hover:text-destructive"
+                          >
                             <Trash2 className="size-3.5" />
                           </Button>
                         </AlertDialogTrigger>
@@ -207,7 +220,8 @@ export function JobTable({ jobs }: { jobs: Job[] }) {
                           <AlertDialogHeader>
                             <AlertDialogTitle>Delete Job</AlertDialogTitle>
                             <AlertDialogDescription>
-                              This will permanently delete this job and all its results. This action cannot be undone.
+                              This will permanently delete this job and all its
+                              results. This action cannot be undone.
                             </AlertDialogDescription>
                           </AlertDialogHeader>
                           <AlertDialogFooter>
@@ -228,7 +242,10 @@ export function JobTable({ jobs }: { jobs: Job[] }) {
             })}
             {filtered.length === 0 && (
               <TableRow>
-                <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                <TableCell
+                  colSpan={7}
+                  className="text-center text-muted-foreground py-8"
+                >
                   No jobs matching filters
                 </TableCell>
               </TableRow>

@@ -82,7 +82,6 @@ export default function JobDetailPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex items-center gap-3 flex-wrap">
         <Button variant="ghost" size="sm" asChild>
           <Link href="/">
@@ -97,7 +96,11 @@ export default function JobDetailPage() {
         </span>
         <AlertDialog>
           <AlertDialogTrigger asChild>
-            <Button variant="outline" size="sm" className="text-destructive border-destructive/30">
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-destructive border-destructive/30"
+            >
               <Trash2 className="size-3.5" />
               Delete
             </Button>
@@ -106,7 +109,8 @@ export default function JobDetailPage() {
             <AlertDialogHeader>
               <AlertDialogTitle>Delete this job?</AlertDialogTitle>
               <AlertDialogDescription>
-                This will permanently delete this job and all its results. This action cannot be undone.
+                This will permanently delete this job and all its results. This
+                action cannot be undone.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
@@ -122,7 +126,6 @@ export default function JobDetailPage() {
         </AlertDialog>
       </div>
 
-      {/* Job info card */}
       <Card>
         <CardContent className="p-6">
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
@@ -143,30 +146,56 @@ export default function JobDetailPage() {
               <Badge variant="secondary">{job.mode}</Badge>
             </div>
             <div>
-              <p className="text-muted-foreground text-xs mb-1">Pages Crawled</p>
+              <p className="text-muted-foreground text-xs mb-1">
+                Pages Crawled
+              </p>
               <p className="font-medium">{job.pages_crawled}</p>
             </div>
             {job.started_at && job.completed_at && (
               <div>
                 <p className="text-muted-foreground text-xs mb-1">Duration</p>
                 <p className="font-medium font-mono">
-                  {((new Date(job.completed_at).getTime() - new Date(job.started_at).getTime()) / 1000).toFixed(2)}s
+                  {(
+                    (new Date(job.completed_at).getTime() -
+                      new Date(job.started_at).getTime()) /
+                    1000
+                  ).toFixed(2)}
+                  s
                 </p>
               </div>
             )}
           </div>
 
-          {/* Timeline */}
           <Separator className="my-4" />
           <div className="flex items-center gap-2 text-xs overflow-x-auto">
-            <TimelineStep label="Created" time={job.created_at} active color="bg-muted-foreground" />
+            <TimelineStep
+              label="Created"
+              time={job.created_at}
+              active
+              color="bg-muted-foreground"
+            />
             <div className="w-8 h-px bg-border" />
-            <TimelineStep label="Started" time={job.started_at} active={!!job.started_at} color="bg-primary" />
+            <TimelineStep
+              label="Started"
+              time={job.started_at}
+              active={!!job.started_at}
+              color="bg-primary"
+            />
             <div className="w-8 h-px bg-border" />
             {job.status === "failed" ? (
-              <TimelineStep label="Failed" time={job.completed_at} active={!!job.completed_at} color="bg-destructive" />
+              <TimelineStep
+                label="Failed"
+                time={job.completed_at}
+                active={!!job.completed_at}
+                color="bg-destructive"
+              />
             ) : (
-              <TimelineStep label="Completed" time={job.completed_at} active={!!job.completed_at} color="bg-success" />
+              <TimelineStep
+                label="Completed"
+                time={job.completed_at}
+                active={!!job.completed_at}
+                color="bg-success"
+              />
             )}
           </div>
 
@@ -179,7 +208,6 @@ export default function JobDetailPage() {
         </CardContent>
       </Card>
 
-      {/* Loading states */}
       {job.status === "queued" && (
         <Card>
           <CardContent className="p-8 text-center">
@@ -200,29 +228,46 @@ export default function JobDetailPage() {
         </Card>
       )}
 
-      {/* Results */}
       {job.results.length > 0 && (
         <div className="space-y-3">
-          <h2 className="text-lg font-semibold">Results ({job.results.length})</h2>
+          <h2 className="text-lg font-semibold">
+            Results ({job.results.length})
+          </h2>
 
           {job.results.map((result, idx) => (
             <Card key={idx}>
               <button
-                onClick={() => setExpandedResult(expandedResult === idx ? null : idx)}
+                onClick={() =>
+                  setExpandedResult(expandedResult === idx ? null : idx)
+                }
                 className="w-full text-left p-4 flex items-center justify-between hover:bg-muted/30 transition-colors rounded-t-xl"
               >
                 <div className="flex items-center gap-2 min-w-0">
-                  <Badge variant="outline" className="text-xs shrink-0">#{idx + 1}</Badge>
-                  <span className="text-sm text-primary truncate">{result.url}</span>
+                  <Badge variant="outline" className="text-xs shrink-0">
+                    #{idx + 1}
+                  </Badge>
+                  <span className="text-sm text-primary truncate">
+                    {result.url}
+                  </span>
                 </div>
                 <div className="flex items-center gap-3 text-xs text-muted-foreground shrink-0">
                   {result.metadata.title && (
-                    <span className="truncate max-w-48 hidden sm:inline">{result.metadata.title}</span>
+                    <span className="truncate max-w-48 hidden sm:inline">
+                      {result.metadata.title}
+                    </span>
                   )}
-                  <Badge variant="secondary" className="text-xs">{result.metadata.word_count} words</Badge>
+                  <Badge variant="secondary" className="text-xs">
+                    {result.metadata.word_count} words
+                  </Badge>
                   <span>{result.metadata.response_time_ms}ms</span>
-                  {result.metadata.used_proxy && <Badge variant="warning" className="text-xs">proxy</Badge>}
-                  <span className="text-muted-foreground">{expandedResult === idx ? "\u25B2" : "\u25BC"}</span>
+                  {result.metadata.used_proxy && (
+                    <Badge variant="warning" className="text-xs">
+                      proxy
+                    </Badge>
+                  )}
+                  <span className="text-muted-foreground">
+                    {expandedResult === idx ? "\u25B2" : "\u25BC"}
+                  </span>
                 </div>
               </button>
 
@@ -244,7 +289,9 @@ export default function JobDetailPage() {
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => copyToClipboard(result.markdown)}
+                                onClick={() =>
+                                  copyToClipboard(result.markdown)
+                                }
                               >
                                 <Copy className="size-3.5" />
                                 Copy
@@ -260,28 +307,75 @@ export default function JobDetailPage() {
 
                       <TabsContent value="metadata" className="p-4">
                         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-                          <MetaItem label="Title" value={result.metadata.title} />
-                          <MetaItem label="Description" value={result.metadata.description} />
-                          <MetaItem label="Language" value={result.metadata.language} />
-                          <MetaItem label="Canonical" value={result.metadata.canonical_url} />
-                          <MetaItem label="OG Image" value={result.metadata.og_image} />
-                          <MetaItem label="Favicon" value={result.metadata.favicon} />
-                          <MetaItem label="Words" value={String(result.metadata.word_count)} />
-                          <MetaItem label="Internal Links" value={String(result.metadata.links_internal)} />
-                          <MetaItem label="External Links" value={String(result.metadata.links_external)} />
-                          <MetaItem label="Images" value={String(result.metadata.images_count)} />
-                          <MetaItem label="Response Time" value={`${result.metadata.response_time_ms}ms`} />
-                          <MetaItem label="Used Proxy" value={result.metadata.used_proxy ? "Yes" : "No"} />
-                          <MetaItem label="Crawled At" value={result.metadata.crawled_at} />
+                          <MetaItem
+                            label="Title"
+                            value={result.metadata.title}
+                          />
+                          <MetaItem
+                            label="Description"
+                            value={result.metadata.description}
+                          />
+                          <MetaItem
+                            label="Language"
+                            value={result.metadata.language}
+                          />
+                          <MetaItem
+                            label="Canonical"
+                            value={result.metadata.canonical_url}
+                          />
+                          <MetaItem
+                            label="OG Image"
+                            value={result.metadata.og_image}
+                          />
+                          <MetaItem
+                            label="Favicon"
+                            value={result.metadata.favicon}
+                          />
+                          <MetaItem
+                            label="Words"
+                            value={String(result.metadata.word_count)}
+                          />
+                          <MetaItem
+                            label="Internal Links"
+                            value={String(result.metadata.links_internal)}
+                          />
+                          <MetaItem
+                            label="External Links"
+                            value={String(result.metadata.links_external)}
+                          />
+                          <MetaItem
+                            label="Images"
+                            value={String(result.metadata.images_count)}
+                          />
+                          <MetaItem
+                            label="Response Time"
+                            value={`${result.metadata.response_time_ms}ms`}
+                          />
+                          <MetaItem
+                            label="Used Proxy"
+                            value={
+                              result.metadata.used_proxy ? "Yes" : "No"
+                            }
+                          />
+                          <MetaItem
+                            label="Crawled At"
+                            value={result.metadata.crawled_at}
+                          />
                           {result.metadata.headings.length > 0 && (
                             <Card className="col-span-full">
                               <CardContent className="p-3">
                                 <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">
-                                  Headings ({result.metadata.headings.length})
+                                  Headings (
+                                  {result.metadata.headings.length})
                                 </p>
                                 <ul className="space-y-0.5">
                                   {result.metadata.headings.map((h, i) => (
-                                    <li key={i} className="text-xs text-muted-foreground">{h}</li>
+                                    <li
+                                      key={i}
+                                      className="text-xs text-muted-foreground"
+                                    >
+                                      {h}
+                                    </li>
                                   ))}
                                 </ul>
                               </CardContent>
@@ -295,7 +389,9 @@ export default function JobDetailPage() {
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => copyToClipboard(result.markdown)}
+                            onClick={() =>
+                              copyToClipboard(result.markdown)
+                            }
                           >
                             <Copy className="size-3.5" />
                             Copy
@@ -332,9 +428,15 @@ function TimelineStep({
 }) {
   return (
     <div className="flex items-center gap-1.5">
-      <div className={`w-2.5 h-2.5 rounded-full ${active ? color : "bg-border"}`} />
+      <div
+        className={`w-2.5 h-2.5 rounded-full ${active ? color : "bg-border"}`}
+      />
       <div>
-        <span className={active ? "text-foreground" : "text-muted-foreground"}>{label}</span>
+        <span
+          className={active ? "text-foreground" : "text-muted-foreground"}
+        >
+          {label}
+        </span>
         {time && (
           <span className="text-muted-foreground ml-1">
             {new Date(time).toLocaleTimeString()}
@@ -345,12 +447,17 @@ function TimelineStep({
   );
 }
 
-function MetaItem({ label, value }: { label: string; value: string | null }) {
+function MetaItem({
+  label,
+  value,
+}: { label: string; value: string | null }) {
   if (!value) return null;
   return (
     <Card>
       <CardContent className="p-3">
-        <p className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</p>
+        <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
+          {label}
+        </p>
         <p className="text-sm break-all mt-0.5">{value}</p>
       </CardContent>
     </Card>

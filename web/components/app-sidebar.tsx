@@ -22,7 +22,7 @@ import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useState, createContext, useContext } from "react";
 
-const SidebarContext = createContext({ open: true, toggle: () => {} });
+const SidebarContext = createContext({ open: true, toggle: () => { } });
 export function useSidebar() {
   return useContext(SidebarContext);
 }
@@ -40,7 +40,10 @@ function SidebarNav({ collapsed }: { collapsed: boolean }) {
   return (
     <nav className="flex flex-col gap-1 px-2">
       {navItems.map((item) => {
-        const active = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
+        const active =
+          item.href === "/"
+            ? pathname === "/"
+            : pathname.startsWith(item.href);
         const linkContent = (
           <Link
             href={item.href}
@@ -85,7 +88,6 @@ export function SidebarProvider({ children }: { children: React.ReactNode }) {
   return (
     <SidebarContext.Provider value={{ open, toggle }}>
       <div className="flex min-h-screen">
-        {/* Mobile overlay */}
         {isMobile && mobileOpen && (
           <div
             className="fixed inset-0 z-40 bg-black/50"
@@ -93,7 +95,6 @@ export function SidebarProvider({ children }: { children: React.ReactNode }) {
           />
         )}
 
-        {/* Sidebar */}
         <aside
           className={cn(
             "fixed top-0 left-0 z-50 flex h-screen flex-col border-r border-sidebar-border bg-sidebar transition-all duration-200",
@@ -106,12 +107,18 @@ export function SidebarProvider({ children }: { children: React.ReactNode }) {
                 : "w-56"
           )}
         >
-          {/* Header */}
-          <div className={cn("flex items-center h-14 px-3", collapsed ? "justify-center" : "justify-between")}>
+          <div
+            className={cn(
+              "flex items-center h-14 px-3",
+              collapsed ? "justify-center" : "justify-between"
+            )}
+          >
             {!collapsed && (
               <Link href="/" className="flex items-center gap-2">
                 <Bug className="size-5 text-primary" />
-                <span className="font-bold text-lg text-sidebar-foreground">Spider</span>
+                <span className="font-bold text-lg text-sidebar-foreground">
+                  Spider
+                </span>
               </Link>
             )}
             {collapsed && (
@@ -123,14 +130,12 @@ export function SidebarProvider({ children }: { children: React.ReactNode }) {
 
           <Separator />
 
-          {/* Nav */}
           <div className="flex-1 py-3 overflow-y-auto">
             <SidebarNav collapsed={collapsed} />
           </div>
 
           <Separator />
 
-          {/* New Job Button */}
           <div className="p-3">
             {collapsed ? (
               <Tooltip>
@@ -154,14 +159,12 @@ export function SidebarProvider({ children }: { children: React.ReactNode }) {
           </div>
         </aside>
 
-        {/* Main content */}
         <div
           className={cn(
             "flex-1 transition-all duration-200",
             isMobile ? "ml-0" : collapsed ? "ml-14" : "ml-56"
           )}
         >
-          {/* Top bar */}
           <header className="sticky top-0 z-30 flex items-center h-14 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-4">
             <Button variant="ghost" size="icon" onClick={toggle}>
               <PanelLeft className="size-4" />

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useSubmitJob, useJob } from "@/lib/api";
 import { StatusBadge } from "@/components/status-badge";
 import { MarkdownViewer } from "@/components/markdown-viewer";
@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/tooltip";
 import { toast } from "sonner";
 import { Loader2, Copy, FlaskConical } from "lucide-react";
+import type { ResultMetadata } from "@/lib/api";
 
 export default function PlaygroundPage() {
   const submitJob = useSubmitJob();
@@ -60,11 +61,11 @@ export default function PlaygroundPage() {
     }
   };
 
-  if (job && history.length > 0 && history[0].id === job.task_id) {
-    if (history[0].status !== job.status) {
-      history[0].status = job.status;
+  useEffect(() => {
+    if (job && history.length > 0 && history[0].id === job.task_id && history[0].status !== job.status) {
+      setHistory((h) => [{ ...h[0], status: job.status }, ...h.slice(1)]);
     }
-  }
+  }, [job?.status, job?.task_id, history]);
 
   const currentResult = job?.results?.[activeResultIdx];
 
@@ -78,18 +79,20 @@ export default function PlaygroundPage() {
       <div>
         <h1 className="text-2xl font-bold">Playground</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Test scrape any URL and see results instantly. Runs a real job through the queue.
+          Test scrape any URL and see results instantly. Runs a real job through
+          the queue.
         </p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-        {/* Left panel */}
         <div className="lg:col-span-4 space-y-4">
           <Card>
             <CardContent className="p-4">
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="pg-url" className="text-xs">URL</Label>
+                  <Label htmlFor="pg-url" className="text-xs">
+                    URL
+                  </Label>
                   <Input
                     id="pg-url"
                     type="url"
@@ -159,7 +162,11 @@ export default function PlaygroundPage() {
                   </p>
                 )}
 
-                <Button type="submit" disabled={submitJob.isPending} className="w-full">
+                <Button
+                  type="submit"
+                  disabled={submitJob.isPending}
+                  className="w-full"
+                >
                   {submitJob.isPending ? (
                     <>
                       <Loader2 className="size-4 animate-spin" />
@@ -173,11 +180,12 @@ export default function PlaygroundPage() {
             </CardContent>
           </Card>
 
-          {/* Session history */}
           {history.length > 0 && (
             <Card>
               <CardHeader className="p-4 pb-2">
-                <CardTitle className="text-xs text-muted-foreground">Session History</CardTitle>
+                <CardTitle className="text-xs text-muted-foreground">
+                  Session History
+                </CardTitle>
               </CardHeader>
               <CardContent className="p-4 pt-0">
                 <ScrollArea className="max-h-64">
@@ -207,7 +215,6 @@ export default function PlaygroundPage() {
           )}
         </div>
 
-        {/* Right panel: Results */}
         <div className="lg:col-span-8">
           {!activeJobId && (
             <Card>
@@ -229,7 +236,6 @@ export default function PlaygroundPage() {
 
           {activeJobId && job && (
             <div className="space-y-4">
-              {/* Status bar */}
               <Card>
                 <CardContent className="p-3 flex items-center justify-between">
                   <div className="flex items-center gap-3">
@@ -240,11 +246,18 @@ export default function PlaygroundPage() {
                   </div>
                   <div className="flex items-center gap-3 text-xs text-muted-foreground">
                     {job.pages_crawled > 0 && (
-                      <Badge variant="secondary" className="text-xs">{job.pages_crawled} page(s)</Badge>
+                      <Badge variant="secondary" className="text-xs">
+                        {job.pages_crawled} page(s)
+                      </Badge>
                     )}
                     {job.started_at && job.completed_at && (
                       <span>
-                        {((new Date(job.completed_at).getTime() - new Date(job.started_at).getTime()) / 1000).toFixed(1)}s
+                        {(
+                          (new Date(job.completed_at).getTime() -
+                            new Date(job.started_at).getTime()) /
+                          1000
+                        ).toFixed(1)}
+                        s
                       </span>
                     )}
                     <span className="text-[10px] font-mono opacity-50">
@@ -254,29 +267,32 @@ export default function PlaygroundPage() {
                 </CardContent>
               </Card>
 
-              {/* Loading states */}
               {(job.status === "queued" || job.status === "running") && (
                 <Card>
                   <CardContent className="p-8 text-center">
                     <Loader2 className="size-6 text-primary mx-auto mb-3 animate-spin" />
                     <p className="text-sm text-muted-foreground">
-                      {job.status === "queued" ? "Waiting for worker..." : "Scraping page..."}
+                      {job.status === "queued"
+                        ? "Waiting for worker..."
+                        : "Scraping page..."}
                     </p>
                   </CardContent>
                 </Card>
               )}
 
-              {/* Error */}
               {job.status === "failed" && job.error && (
                 <Card className="border-destructive/30">
                   <CardContent className="p-4">
-                    <p className="font-medium mb-1 text-destructive text-sm">Scrape Failed</p>
-                    <p className="font-mono text-xs text-destructive/80">{job.error}</p>
+                    <p className="font-medium mb-1 text-destructive text-sm">
+                      Scrape Failed
+                    </p>
+                    <p className="font-mono text-xs text-destructive/80">
+                      {job.error}
+                    </p>
                   </CardContent>
                 </Card>
               )}
 
-              {/* Results */}
               {job.results.length > 0 && (
                 <>
                   {job.results.length > 1 && (
@@ -318,7 +334,9 @@ export default function PlaygroundPage() {
                                   <Button
                                     variant="ghost"
                                     size="sm"
-                                    onClick={() => copyToClipboard(currentResult.markdown)}
+                                    onClick={() =>
+                                      copyToClipboard(currentResult.markdown)
+                                    }
                                   >
                                     <Copy className="size-3.5" />
                                     Copy
@@ -333,16 +351,26 @@ export default function PlaygroundPage() {
                           </TabsContent>
 
                           <TabsContent value="metadata" className="p-4">
-                            <MetadataGrid metadata={currentResult.metadata} url={currentResult.url} />
+                            <MetadataGrid
+                              metadata={currentResult.metadata}
+                              url={currentResult.url}
+                            />
                           </TabsContent>
 
                           <TabsContent value="headings" className="p-4">
                             {currentResult.metadata.headings.length === 0 ? (
-                              <p className="text-sm text-muted-foreground">No headings found</p>
+                              <p className="text-sm text-muted-foreground">
+                                No headings found
+                              </p>
                             ) : (
                               <ul className="space-y-1">
                                 {currentResult.metadata.headings.map((h, i) => (
-                                  <li key={i} className="text-sm text-muted-foreground font-mono">{h}</li>
+                                  <li
+                                    key={i}
+                                    className="text-sm text-muted-foreground font-mono"
+                                  >
+                                    {h}
+                                  </li>
                                 ))}
                               </ul>
                             )}
@@ -353,7 +381,9 @@ export default function PlaygroundPage() {
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => copyToClipboard(currentResult.markdown)}
+                                onClick={() =>
+                                  copyToClipboard(currentResult.markdown)
+                                }
                               >
                                 <Copy className="size-3.5" />
                                 Copy
@@ -382,10 +412,7 @@ export default function PlaygroundPage() {
 function MetadataGrid({
   metadata,
   url,
-}: {
-  metadata: import("@/lib/api").ResultMetadata;
-  url: string;
-}) {
+}: { metadata: ResultMetadata; url: string }) {
   const items: { label: string; value: string | number | boolean | null }[] = [
     { label: "URL", value: url },
     { label: "Title", value: metadata.title },

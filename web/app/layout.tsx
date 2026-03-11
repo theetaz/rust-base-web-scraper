@@ -1,32 +1,42 @@
 "use client";
 
-import "./globals.css";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState } from "react";
-import { Toaster } from "@/components/ui/sonner";
+import { Geist_Mono, Inter } from "next/font/google";
+import "./globals.css";
+import { ThemeProvider } from "@/components/theme-provider";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { Toaster } from "@/components/ui/sonner";
 import { SidebarProvider } from "@/components/app-sidebar";
-import { Inter } from "next/font/google";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 
-const inter = Inter({subsets:['latin'],variable:'--font-sans'});
-
+const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
+const fontMono = Geist_Mono({
+  subsets: ["latin"],
+  variable: "--font-mono",
+});
 
 export default function RootLayout({
   children,
-}: {
-  children: React.ReactNode;
-}) {
+}: Readonly<{ children: React.ReactNode }>) {
   const [queryClient] = useState(() => new QueryClient());
 
   return (
-    <html lang="en" className={cn("dark", "font-sans", inter.variable)}>
-      <body className="min-h-screen">
+    <html
+      lang="en"
+      suppressHydrationWarning
+      className={cn("antialiased dark", fontMono.variable, "font-sans", inter.variable)}
+    >
+      <body>
         <QueryClientProvider client={queryClient}>
-          <TooltipProvider delayDuration={0}>
-            <SidebarProvider>{children}</SidebarProvider>
-          </TooltipProvider>
-          <Toaster />
+          <ThemeProvider defaultTheme="dark" storageKey="spider-theme">
+            <TooltipProvider delayDuration={0}>
+              <SidebarProvider>
+                {children}
+                <Toaster />
+              </SidebarProvider>
+            </TooltipProvider>
+          </ThemeProvider>
         </QueryClientProvider>
       </body>
     </html>

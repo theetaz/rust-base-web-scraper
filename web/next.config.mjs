@@ -1,6 +1,5 @@
-import type { NextConfig } from "next";
-
-const nextConfig: NextConfig = {
+/** @type {import('next').NextConfig} */
+const nextConfig = {
   output: "standalone",
   async rewrites() {
     return [
@@ -8,8 +7,8 @@ const nextConfig: NextConfig = {
         source: "/api/:path*",
         destination: `${process.env.API_URL || "http://localhost:9000"}/api/:path*`,
       },
-    ];
+    ]
   },
-};
+}
 
-export default nextConfig;
+export default nextConfig

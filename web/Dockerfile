@@ -4,7 +4,6 @@ WORKDIR /app
 COPY package.json package-lock.json* ./
 RUN npm ci || npm install
 
-# API_URL must be available at build time for Next.js rewrites
 ARG API_URL=http://localhost:9000
 ENV API_URL=${API_URL}
 
