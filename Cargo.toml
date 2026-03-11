@@ -40,3 +40,8 @@ spider_transformations = "2"
 scraper = "0.19"
 url = "2"
 rand = "0.8"
+
+# PDF parsing
+pdf_oxide = "0.3"
+reqwest = { version = "0.12", features = ["stream"] }
+tempfile = "3"
