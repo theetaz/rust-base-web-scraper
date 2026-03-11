@@ -1,164 +1,397 @@
 # Spider Web Crawler
 
-A production-grade, self-hosted web scraping API built in Rust with a Next.js dashboard. Features background job processing, stealth browser automation, proxy fallback, and real-time monitoring.
+A production-grade, self-hosted web scraping API built in Rust with a Next.js dashboard. Features background job processing, stealth browser automation, proxy fallback, PDF support, and real-time monitoring.
 
 ## Architecture
 
 ```
-┌──────────────────────────────────────────────────────────┐
-│                     Docker Compose                        │
-│                                                           │
-│  ┌──────────────┐  ┌───────┐  ┌────────────────────────┐ │
-│  │  Rust API    │──│ Redis │  │  Next.js Dashboard     │ │
-│  │  (Axum)      │  │       │  │  (TanStack Query)      │ │
-│  │  + Workers   │  └───────┘  │  :3400 → API :9000     │ │
-│  │  + SQLite    │             └────────────────────────┘ │
-│  │  :9000       │                                        │
-│  └──────────────┘                                        │
-└──────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────┐
+│                        Docker Compose                                │
+│                                                                      │
+│  ┌──────────────────┐  ┌─────────┐  ┌────────────────────────────┐ │
+│  │  Rust API        │──│  Redis  │  │  Next.js Dashboard          │ │
+│  │  (Axum)          │  │  Queue  │  │  (TanStack Query, shadcn)   │ │
+│  │  + Workers       │  └─────────┘  │  :3400 → API :9000          │ │
+│  │  + SQLite        │               └────────────────────────────┘ │
+│  │  :9000           │                                               │
+│  └──────────────────┘                                               │
+└─────────────────────────────────────────────────────────────────────┘
 ```
 
-- **Axum API** (`:9000`) — REST endpoints for submitting/polling scrape jobs
-- **Redis** — Job queue (LPUSH/BRPOP for worker coordination)
+- **Axum API** (`:9000`) — REST endpoints for submitting, polling, and managing scrape jobs
+- **Redis** — Job queue (LPUSH/BRPOP) for worker coordination
 - **SQLite** — Persistent storage for jobs, results, and metadata
 - **Background Workers** — Tokio tasks pulling from Redis, running stealth browser scrapes
-- **Next.js Dashboard** (`:3400`) — Real-time monitoring, playground, queue visualization
+- **Next.js Dashboard** (`:3400`) — Real-time monitoring, playground, queue visualization, storage cleanup
 
-## Features
+## How It Works
 
-- **Three scrape modes**: `scrape` (single page with browser), `crawl` (follow links with browser), `http` (fast, no browser)
-- **Stealth browser automation**: UA rotation, viewport randomization, WebGL/Canvas fingerprint spoofing, CDP marker cleanup
-- **Proxy fallback**: Auto-detects blocking (403, 429, Cloudflare challenges) and retries via configured proxy
-- **Background job processing**: Redis-backed queue with configurable worker count
-- **Rich metadata extraction**: Title, description, OG tags, word count, links, headings, response time
-- **HTML to Markdown conversion**: Clean markdown output via spider_transformations
-- **Real-time dashboard**: Live job monitoring, playground for testing, queue visualization, API tester
-- **CLI mode**: Direct scraping without the API server
+1. **Submit Job** — Client POSTs a URL and mode to `/api/scrape`. The API creates a job record in SQLite, enqueues the task ID to Redis, and returns immediately with `task_id`.
+2. **Worker Pickup** — Background workers block on Redis (BRPOP). When a task appears, a worker claims it and updates the job status to `running`.
+3. **Scraping** — Depending on mode:
+   - **scrape** — Launches headless Chrome, loads the page, waits for JS, extracts HTML → Markdown
+   - **crawl** — Same as scrape but follows internal links up to `limit` pages
+   - **http** — Fast HTTP fetch, no browser; uses spider for link following
+4. **PDF Handling** — If the URL points to a PDF, the worker downloads it, converts to Markdown with embedded images, and stores images under `data/pdf_images/{task_id}/`.
+5. **Completion** — Worker writes results to SQLite, updates job status to `completed` or `failed`, and loops back to Redis for the next task.
+6. **Polling** — Clients GET `/api/scrape/{task_id}` to fetch job status and results.
 
-## Quick Start
+---
 
-### Prerequisites
+## API Reference
 
-- [Docker](https://docs.docker.com/get-docker/) and Docker Compose
+Base URL: `http://localhost:9000` (or your deployed host)
 
-### Run with Docker Compose
+### 1. Submit Scrape Job
 
-```bash
-# Clone the repository
-git clone https://github.com/theetaz/rust-base-web-scraper.git
-cd rust-base-web-scraper
+**`POST /api/scrape`**
 
-# Copy environment config
-cp .env.example .env
+Creates a new scrape job and enqueues it for processing.
 
-# Start all services
-docker compose up --build
-```
+**Request Body:**
 
-- **API**: http://localhost:9000
-- **Dashboard**: http://localhost:3400
-- **Health check**: http://localhost:9000/api/health
-
-### Configure Proxy (Optional)
-
-Edit `.env` to add proxy credentials:
-
-```env
-PROXY_HOST=proxy.example.com
-PROXY_PORT=8080
-PROXY_USERNAME=your_username
-PROXY_PASSWORD=your_password
-PROXY_PROTOCOL=http  # or socks5
-```
-
-#### Proxy Mode
-
-Control when the proxy is used with the `PROXY_MODE` environment variable:
-
-| Mode | Description |
-|------|-------------|
-| `fallback` | Try direct first, use proxy only when blocked (default) |
-| `always` | Route all requests through the proxy |
-| `never` | Never use proxy, even if configured |
-
-```env
-PROXY_MODE=fallback  # default
-```
-
-Restart the API container to apply:
-
-```bash
-docker compose up -d api
-```
-
-## API Endpoints
-
-### Submit a scrape job
-
-```bash
-curl -X POST http://localhost:9000/api/scrape \
-  -H "Content-Type: application/json" \
-  -d '{"url": "https://example.com", "mode": "scrape", "limit": 10, "wait_seconds": 3}'
-```
-
-**Response** (`202 Accepted`):
 ```json
 {
-  "task_id": "550e8400-...",
+  "url": "https://example.com/article",
+  "mode": "scrape",
+  "limit": 10,
+  "wait_seconds": 3,
+  "main_content": false
+}
+```
+
+| Field          | Type    | Default    | Description                                     |
+| -------------- | ------- | ---------- | ----------------------------------------------- |
+| `url`          | string  | required   | URL to scrape                                   |
+| `mode`         | string  | `"scrape"` | `scrape`, `crawl`, or `http`                    |
+| `limit`        | number  | `10`       | Max pages to crawl (for crawl/http modes)       |
+| `wait_seconds` | number  | `3`        | Seconds to wait for JS rendering (scrape/crawl) |
+| `main_content` | boolean | `false`    | Extract only main article content               |
+
+**Response** (`202 Accepted`):
+
+```json
+{
+  "task_id": "550e8400-e29b-41d4-a716-446655440000",
   "status": "queued",
   "created_at": "2026-03-10T12:00:00Z"
 }
 ```
 
-### Poll job status
+---
 
-```bash
-curl http://localhost:9000/api/scrape/{task_id}
+### 2. List Jobs
+
+**`GET /api/scrape?limit=50&offset=0`**
+
+Returns a paginated list of all jobs.
+
+**Query Parameters:**
+| Param | Type | Default | Description |
+|---------|--------|---------|--------------------|
+| `limit`| number | `50` | Max jobs to return |
+| `offset`| number| `0` | Pagination offset |
+
+**Response** (`200 OK`):
+
+```json
+{
+  "jobs": [
+    {
+      "id": "550e8400-e29b-41d4-a716-446655440000",
+      "url": "https://example.com",
+      "mode": "scrape",
+      "page_limit": 10,
+      "wait_seconds": 3,
+      "status": "completed",
+      "error": null,
+      "pages_crawled": 1,
+      "created_at": "2026-03-10T12:00:00Z",
+      "started_at": "2026-03-10T12:00:01Z",
+      "completed_at": "2026-03-10T12:00:05Z",
+      "main_content": false
+    }
+  ],
+  "total": 42,
+  "limit": 50,
+  "offset": 0
+}
 ```
 
-### Other endpoints
+---
 
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/api/scrape` | List all jobs (with `?limit=50&offset=0`) |
-| `GET` | `/api/scrape/:id` | Get job details and results |
-| `DELETE` | `/api/scrape/:id` | Delete a job and its results |
-| `GET` | `/api/stats` | Job statistics and metrics |
-| `GET` | `/api/queue/status` | Queue depth and worker status |
-| `GET` | `/api/system` | System health and configuration |
-| `GET` | `/api/health` | Health check (Redis + SQLite) |
+### 3. Get Job Detail
+
+**`GET /api/scrape/{task_id}`**
+
+Returns full job details including scraped results and metadata.
+
+**Response** (`200 OK`):
+
+```json
+{
+  "task_id": "550e8400-e29b-41d4-a716-446655440000",
+  "status": "completed",
+  "url": "https://example.com/article",
+  "mode": "scrape",
+  "pages_crawled": 1,
+  "created_at": "2026-03-10T12:00:00Z",
+  "started_at": "2026-03-10T12:00:01Z",
+  "completed_at": "2026-03-10T12:00:05Z",
+  "error": null,
+  "results": [
+    {
+      "url": "https://example.com/article",
+      "markdown": "# Article Title\n\nParagraph content...",
+      "metadata": {
+        "title": "Article Title",
+        "description": "Meta description",
+        "language": "en",
+        "canonical_url": "https://example.com/article",
+        "og_image": "https://example.com/og.jpg",
+        "favicon": "https://example.com/favicon.ico",
+        "word_count": 1250,
+        "links_internal": 12,
+        "links_external": 5,
+        "images_count": 3,
+        "headings": ["# Title", "## Section 1", "## Section 2"],
+        "response_time_ms": 4200,
+        "used_proxy": false,
+        "crawled_at": "2026-03-10T12:00:04Z"
+      },
+      "assets": [
+        {
+          "filename": "page-1.png",
+          "url": "/api/pdf-images/550e8400.../page-1.png",
+          "content_type": "image/png"
+        }
+      ]
+    }
+  ]
+}
+```
+
+**Error** (`404 Not Found`):
+
+```json
+{
+  "error": "Not found: Job 550e8400-... not found"
+}
+```
+
+---
+
+### 4. Delete Job
+
+**`DELETE /api/scrape/{task_id}`**
+
+Permanently deletes a job, its results, and associated PDF images.
+
+**Response** (`204 No Content`) — Empty body.
+
+**Error** (`404 Not Found`):
+
+```json
+{
+  "error": "Not found: Job 550e8400-... not found"
+}
+```
+
+---
+
+### 5. Serve PDF Image
+
+**`GET /api/pdf-images/{task_id}/{filename}`**
+
+Serves an image file extracted from a PDF during scraping. Used when viewing job results that include PDF-derived assets.
+
+**Response** (`200 OK`) — Binary image (PNG, JPEG, etc.) with appropriate `Content-Type`.
+
+**Error** (`404 Not Found`) — File not found or invalid path.
+
+---
+
+### 6. Get Stats
+
+**`GET /api/stats`**
+
+Returns aggregate job statistics and queue depth.
+
+**Response** (`200 OK`):
+
+```json
+{
+  "jobs": {
+    "total": 150,
+    "queued": 2,
+    "running": 1,
+    "completed": 140,
+    "failed": 7,
+    "total_pages_crawled": 312,
+    "avg_response_time_ms": 4523.5,
+    "total_results": 312
+  },
+  "queue_depth": 2,
+  "max_workers": 3
+}
+```
+
+---
+
+### 7. Get Queue Status
+
+**`GET /api/queue/status`**
+
+Returns queue metrics and recent activity for pipeline visualization.
+
+**Response** (`200 OK`):
+
+```json
+{
+  "queue_depth": 2,
+  "max_workers": 3,
+  "running_jobs": 1,
+  "queued_jobs": 2,
+  "recent_activity": [
+    {
+      "id": "550e8400-e29b-41d4-a716-446655440000",
+      "url": "https://example.com",
+      "status": "completed",
+      "mode": "scrape",
+      "pages_crawled": 1,
+      "error": null,
+      "created_at": "2026-03-10T12:00:00Z",
+      "started_at": "2026-03-10T12:00:01Z",
+      "completed_at": "2026-03-10T12:00:05Z"
+    }
+  ]
+}
+```
+
+---
+
+### 8. Get System Info
+
+**`GET /api/system`**
+
+Returns health status, configuration, and recent failed jobs.
+
+**Response** (`200 OK`):
+
+```json
+{
+  "health": {
+    "status": "ok",
+    "redis": "connected",
+    "sqlite": "connected"
+  },
+  "config": {
+    "port": 9000,
+    "max_workers": 3,
+    "proxy_configured": true,
+    "proxy_mode": "fallback",
+    "database_url": "sqlite:///data/spider.db",
+    "redis_url": "redis://redis:6379"
+  },
+  "recent_errors": [
+    {
+      "id": "abc123...",
+      "url": "https://blocked-site.com",
+      "status": "failed",
+      "error": "Blocked by site: Cloudflare challenge",
+      "completed_at": "2026-03-10T12:05:00Z"
+    }
+  ]
+}
+```
+
+---
+
+### 9. Health Check
+
+**`GET /api/health`**
+
+Lightweight health check for Redis and SQLite connectivity.
+
+**Response** (`200 OK`):
+
+```json
+{
+  "status": "ok",
+  "redis": "connected",
+  "sqlite": "connected"
+}
+```
+
+`status` is `"ok"` when both Redis and SQLite are connected; otherwise `"degraded"`.
+
+---
+
+### 10. Storage Cleanup
+
+**`POST /api/cleanup?mode=orphaned`**
+
+Removes PDF image directories to free disk space.
+
+**Query Parameters:**
+| Param | Type | Default | Description |
+|--------|--------|------------|-----------------------------------------------------------------------------|
+| `mode` | string | `"orphaned"` | `orphaned` — remove dirs for jobs no longer in DB; `all` — remove everything |
+
+**Response** (`200 OK`):
+
+```json
+{
+  "removed_count": 5,
+  "freed_bytes": 15728640
+}
+```
+
+`removed_count` is the number of directories removed; `freed_bytes` is total bytes freed.
+
+---
 
 ## Scrape Modes
 
-| Mode | Description | Browser | Link Following |
-|------|-------------|---------|----------------|
-| `scrape` | Single page with full JS rendering | Yes | No |
-| `crawl` | Follow internal links with browser | Yes | Yes |
-| `http` | Fast HTTP crawl, no JS rendering | No | Yes |
+| Mode     | Description              | Browser | Link Following |
+| -------- | ------------------------ | ------- | -------------- |
+| `scrape` | Single page with full JS | Yes     | No             |
+| `crawl`  | Follow internal links    | Yes     | Yes            |
+| `http`   | Fast HTTP crawl, no JS   | No      | Yes            |
 
-## CLI Mode
+---
 
-Run scrapes directly without the API server:
+## Quick Start
+
+### Docker Compose
 
 ```bash
-# Single page scrape with browser
-spider-web-crawler cli --url "https://example.com" --scrape --wait 5
-
-# Crawl with browser (follow links)
-spider-web-crawler cli --url "https://example.com" --browser --limit 10
-
-# HTTP crawl (no browser, fastest)
-spider-web-crawler cli --url "https://example.com" --limit 20
+cp .env.example .env
+docker compose up --build
 ```
 
-## Dashboard
+- **API**: http://localhost:9000
+- **Dashboard**: http://localhost:3400
+- **Health**: http://localhost:9000/api/health
 
-The web dashboard at `http://localhost:3400` provides:
+### Local Development
 
-- **Dashboard** — Job list with real-time status updates, statistics cards
-- **Playground** — Interactive URL scraper with live results, markdown preview
-- **Queue Monitor** — Pipeline visualization, worker slots, throughput metrics
-- **System** — Health indicators, configuration, API tester, error logs
+**Terminal 1 — Backend:**
+
+```bash
+# Start Redis first: docker run -d -p 6379:6379 redis:7-alpine
+cargo run -- serve
+```
+
+**Terminal 2 — Web:**
+
+```bash
+cd web
+npm install
+API_URL=http://localhost:9000 npm run dev
+```
+
+---
 
 ## Project Structure
 
@@ -166,92 +399,33 @@ The web dashboard at `http://localhost:3400` provides:
 ├── src/
 │   ├── main.rs          # CLI/server entrypoint
 │   ├── config.rs        # Environment configuration
-│   ├── error.rs         # Error types
 │   ├── db.rs            # SQLite schema and queries
 │   ├── queue.rs         # Redis job queue
 │   ├── worker.rs        # Background worker loop
 │   ├── crawler.rs       # Crawl logic (browser + HTTP)
+│   ├── pdf.rs           # PDF scraping and image cleanup
 │   ├── stealth.rs       # Anti-detection browser automation
-│   ├── proxy.rs         # Block detection and proxy fallback
-│   ├── metadata.rs      # HTML metadata extraction
 │   └── api/
 │       ├── mod.rs       # Axum router
 │       ├── handlers.rs  # Route handlers
 │       └── models.rs    # Request/response types
-├── migrations/
-│   └── 001_init.sql     # SQLite schema
-├── web/                 # Next.js dashboard
+├── web/                 # Next.js 16 dashboard
 │   ├── app/             # App Router pages
-│   ├── components/      # React components
+│   ├── components/      # shadcn/ui components
 │   └── lib/api.ts       # API client + TanStack Query hooks
-├── scripts/
-│   └── docker-publish.sh # Multi-platform Docker build & push
+├── migrations/
 ├── docker-compose.yml
-├── Dockerfile           # API container
-└── .env.example         # Environment template
+└── Dockerfile
 ```
 
-## Development
-
-### Local Rust development
-
-```bash
-# Install Rust
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-
-# Build
-cargo build
-
-# Run API server (requires Redis)
-REDIS_URL=redis://127.0.0.1:6379 cargo run -- serve
-
-# Run CLI mode
-cargo run -- cli --url "https://example.com" --scrape
-```
-
-### Local frontend development
-
-```bash
-cd web
-npm install
-npm run dev  # http://localhost:3000
-```
-
-## Docker Hub
-
-### Pull pre-built images
-
-```bash
-docker pull theetaz/spider-web-crawler-api:latest
-docker pull theetaz/spider-web-crawler-web:latest
-```
-
-### Build and push (maintainers)
-
-```bash
-# Login to Docker Hub
-docker login
-
-# Build and push multi-platform images
-./scripts/docker-publish.sh --tag v1.0.0 --registry theetaz
-```
+---
 
 ## Tech Stack
 
-### Backend (Rust)
-- **axum** — Web framework
-- **tokio** — Async runtime
-- **sqlx** — SQLite async driver
-- **redis** — Job queue
-- **headless_chrome** — Browser automation
-- **spider** — HTTP crawling
-- **scraper** — HTML parsing
+**Backend:** axum, tokio, sqlx, redis, headless_chrome, spider, pdf_oxide  
+**Frontend:** Next.js 16, React 19, TanStack Query, Tailwind v4, shadcn/ui
 
-### Frontend (TypeScript)
-- **Next.js 15** — React framework (App Router)
-- **TanStack Query** — Server state management
-- **Tailwind CSS v4** — Styling
-- **react-markdown** — Markdown rendering
+---
 
 ## License
 
