@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 
+use crate::crawler::Asset;
 use crate::db::{Job, JobResult};
 
 #[derive(Debug, Deserialize)]
@@ -51,6 +52,7 @@ pub struct ResultItem {
     pub url: String,
     pub markdown: String,
     pub metadata: ResultMetadata,
+    pub assets: Vec<Asset>,
 }
 
 #[derive(Debug, Serialize)]
@@ -135,6 +137,11 @@ impl JobDetailResponse {
                     .as_deref()
                     .and_then(|h| serde_json::from_str(h).ok())
                     .unwrap_or_default();
+                let assets: Vec<Asset> = r
+                    .assets_json
+                    .as_deref()
+                    .and_then(|a| serde_json::from_str(a).ok())
+                    .unwrap_or_default();
                 ResultItem {
                     url: r.url,
                     markdown: r.markdown,
@@ -154,6 +161,7 @@ impl JobDetailResponse {
                         used_proxy: r.used_proxy.unwrap_or(false),
                         crawled_at: r.crawled_at,
                     },
+                    assets,
                 }
             })
             .collect();
