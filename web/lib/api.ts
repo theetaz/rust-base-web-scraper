@@ -228,13 +228,12 @@ export function useCleanupStorage() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (params: { mode: "orphaned" | "all" }) =>
-      apiFetch<CleanupResponse>(
-        `/api/cleanup?mode=${params.mode}`,
-        { method: "POST" }
-      ),
+      apiFetch<CleanupResponse>(`/api/cleanup?mode=${params.mode}`, {
+        method: "POST"
+      }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["system"] });
-    },
+    }
   });
 }
 
