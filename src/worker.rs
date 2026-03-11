@@ -4,6 +4,7 @@ use std::sync::Arc;
 use crate::config::Config;
 use crate::crawler;
 use crate::db;
+use crate::pdf;
 use crate::queue;
 
 pub async fn start_workers(pool: Arc<SqlitePool>, config: Arc<Config>) {
@@ -53,23 +54,30 @@ async fn worker_loop(pool: Arc<SqlitePool>, config: Arc<Config>, worker_id: usiz
         let retry = config.retry.clone();
         let main_content = job.main_content.unwrap_or(false);
 
-        let result = match mode.as_str() {
-            "scrape" => {
-                let proxy_ref = proxy.as_deref().map(String::from);
-                tokio::task::spawn_blocking(move || {
-                    crawler::scrape_single(&url, wait, proxy_ref.as_deref(), &proxy_mode, &retry, main_content)
-                })
-                .await
+        let is_pdf = pdf::is_pdf_url(&url) || pdf::is_pdf_content_type(&url).await;
+
+        let result = if is_pdf {
+            tracing::info!("Detected PDF URL, using pdf_oxide: {}", url);
+            Ok(pdf::scrape_pdf(&url).await)
+        } else {
+            match mode.as_str() {
+                "scrape" => {
+                    let proxy_ref = proxy.as_deref().map(String::from);
+                    tokio::task::spawn_blocking(move || {
+                        crawler::scrape_single(&url, wait, proxy_ref.as_deref(), &proxy_mode, &retry, main_content)
+                    })
+                    .await
+                }
+                "crawl" => {
+                    let proxy_ref = proxy.as_deref().map(String::from);
+                    tokio::task::spawn_blocking(move || {
+                        crawler::crawl_browser(&url, limit, wait, proxy_ref.as_deref(), &proxy_mode, &retry, main_content)
+                    })
+                    .await
+                }
+                "http" => Ok(Ok(crawler::crawl_http(&url, limit, main_content).await)),
+                _ => Ok(Err("Unknown mode".to_string())),
             }
-            "crawl" => {
-                let proxy_ref = proxy.as_deref().map(String::from);
-                tokio::task::spawn_blocking(move || {
-                    crawler::crawl_browser(&url, limit, wait, proxy_ref.as_deref(), &proxy_mode, &retry, main_content)
-                })
-                .await
-            }
-            "http" => Ok(Ok(crawler::crawl_http(&url, limit, main_content).await)),
-            _ => Ok(Err("Unknown mode".to_string())),
         };
 
         match result {
