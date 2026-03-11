@@ -1,13 +1,16 @@
+use axum::body::Body;
 use axum::extract::{Path, Query, State};
-use axum::http::StatusCode;
+use axum::http::{header, StatusCode};
+use axum::response::IntoResponse;
 use axum::Json;
 use uuid::Uuid;
 
 use crate::api::models::*;
+use crate::api::AppState;
 use crate::db;
 use crate::error::CrawlError;
+use crate::pdf;
 use crate::queue;
-use crate::api::AppState;
 
 pub async fn submit_scrape(
     State(state): State<AppState>,
@@ -82,6 +85,7 @@ pub async fn delete_scrape(
     Path(task_id): Path<String>,
 ) -> Result<StatusCode, CrawlError> {
     db::delete_job(&state.db, &task_id).await?;
+    pdf::cleanup_images(&task_id);
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -189,4 +193,39 @@ pub async fn health_check(
             "disconnected".into()
         },
     })
+}
+
+pub async fn serve_pdf_image(
+    Path((task_id, filename)): Path<(String, String)>,
+) -> impl IntoResponse {
+    let safe_filename = std::path::Path::new(&filename)
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("");
+
+    if safe_filename.is_empty() || safe_filename.contains("..") {
+        return StatusCode::BAD_REQUEST.into_response();
+    }
+
+    let path = std::path::PathBuf::from("data/pdf_images")
+        .join(&task_id)
+        .join(safe_filename);
+
+    match tokio::fs::read(&path).await {
+        Ok(bytes) => {
+            let content_type = match path.extension().and_then(|e| e.to_str()) {
+                Some("png") => "image/png",
+                Some("jpg" | "jpeg") => "image/jpeg",
+                Some("gif") => "image/gif",
+                Some("webp") => "image/webp",
+                _ => "application/octet-stream",
+            };
+            (
+                [(header::CONTENT_TYPE, content_type)],
+                Body::from(bytes),
+            )
+                .into_response()
+        }
+        Err(_) => StatusCode::NOT_FOUND.into_response(),
+    }
 }

@@ -146,7 +146,7 @@ async fn run_cli(url: String, limit: u32, output: String, browser: bool, scrape:
 
     let results = if is_pdf {
         println!("Detected PDF, using pdf_oxide parser");
-        pdf::scrape_pdf(&url).await.expect("PDF parse failed")
+        pdf::scrape_pdf_cli(&url, &output).await.expect("PDF parse failed")
     } else if scrape {
         let proxy_ref = proxy.as_deref().map(String::from);
         tokio::task::spawn_blocking(move || {

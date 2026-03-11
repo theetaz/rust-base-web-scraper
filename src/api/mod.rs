@@ -30,6 +30,7 @@ pub fn create_router(state: AppState) -> Router {
         .route("/api/scrape", get(handlers::list_scrapes))
         .route("/api/scrape/{task_id}", get(handlers::get_scrape))
         .route("/api/scrape/{task_id}", delete(handlers::delete_scrape))
+        .route("/api/pdf-images/{task_id}/{filename}", get(handlers::serve_pdf_image))
         .route("/api/stats", get(handlers::get_stats))
         .route("/api/queue/status", get(handlers::get_queue_status))
         .route("/api/system", get(handlers::get_system_info))

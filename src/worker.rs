@@ -58,7 +58,7 @@ async fn worker_loop(pool: Arc<SqlitePool>, config: Arc<Config>, worker_id: usiz
 
         let result = if is_pdf {
             tracing::info!("Detected PDF URL, using pdf_oxide: {}", url);
-            Ok(pdf::scrape_pdf(&url).await)
+            Ok(pdf::scrape_pdf(&url, &task_id).await)
         } else {
             match mode.as_str() {
                 "scrape" => {

@@ -3777,6 +3777,7 @@ dependencies = [
  "pdf_oxide",
  "rand 0.8.5",
  "redis",
+ "regex",
  "reqwest 0.12.28",
  "scraper",
  "serde",
