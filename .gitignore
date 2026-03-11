@@ -39,3 +39,6 @@ Thumbs.db
 .cursorrules
 .claude
 skills-lock.json
+
+# Scripts
+scripts/
