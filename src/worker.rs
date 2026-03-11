@@ -84,6 +84,11 @@ async fn worker_loop(pool: Arc<SqlitePool>, config: Arc<Config>, worker_id: usiz
             Ok(Ok(crawl_results)) => {
                 let count = crawl_results.len() as i32;
                 for cr in &crawl_results {
+                    let assets_json = if cr.assets.is_empty() {
+                        None
+                    } else {
+                        Some(serde_json::to_string(&cr.assets).unwrap_or_default())
+                    };
                     if let Err(e) = db::insert_result(
                         &pool,
                         &task_id,
@@ -92,6 +97,7 @@ async fn worker_loop(pool: Arc<SqlitePool>, config: Arc<Config>, worker_id: usiz
                         &cr.metadata,
                         cr.response_time_ms,
                         cr.used_proxy,
+                        assets_json.as_deref(),
                     )
                     .await
                     {
